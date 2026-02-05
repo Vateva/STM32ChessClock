@@ -20,7 +20,7 @@
 #define P1_ENC_PUSH_PIN   GPIO_PIN_2
 #define P1_CONFIRM_PIN    GPIO_PIN_3
 #define P1_BACK_PIN       GPIO_PIN_4
-#define P1_TAP_PIN        GPIO_PIN_5
+#define P1_TAP_PIN        GPIO_PIN_15
 #define P1_BTN_PORT       GPIOA
 
 // pin definitions for player 2
