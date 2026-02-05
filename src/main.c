@@ -185,17 +185,17 @@ int main(void) {
     
     // run tests
     while (1) {
-        test_displays();
-        delay_ms(5000);
+        //test_displays();
+        //delay_ms(5000);
         
-        test_encoders();
-        delay_ms(5000);
+        //test_encoders();
+       // delay_ms(5000);
         
         test_buttons();
         delay_ms(30000);
         
-        test_buzzer();
-        delay_ms(5000);
+        //test_buzzer();
+        //delay_ms(5000);
     }
 }
 
@@ -464,12 +464,11 @@ void test_encoders(void) {
     // run test for 5 seconds
     while ((HAL_GetTick() - start_time) < 5000) {
         // update counters from encoder deltas
-        counter_p1 += encoder_p1_delta;
+        counter_p1 += encoder_p1_delta / 2;  //divide by 2 to count 1 unit per click
         encoder_p1_delta = 0;
-        
-        counter_p2 += encoder_p2_delta;
+
+        counter_p2 += encoder_p2_delta / 2;
         encoder_p2_delta = 0;
-        
         // update display
         sprintf(buf, "%d  ", counter_p1);
         sh1106_draw_string(&hi2c1, 5, 4, buf);
@@ -584,10 +583,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
         // lookup table for quadrature decoding
         if (transition == 0b0001 || transition == 0b0111 || 
             transition == 0b1110 || transition == 0b1000) {
-            encoder_p1_delta++;
+            encoder_p1_delta--;
         } else if (transition == 0b0010 || transition == 0b1011 || 
                    transition == 0b1101 || transition == 0b0100) {
-            encoder_p1_delta--;
+            encoder_p1_delta++;
         }
         
         encoder_p1_last_state = state;
