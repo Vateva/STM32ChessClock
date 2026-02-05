@@ -37,9 +37,11 @@
 #define P2_TAP_PIN        GPIO_PIN_9
 #define P2_BTN2_PORT      GPIOA
 
-// buzzer pin
+// buzzer pin (pa6 = tim3_ch1)
 #define BUZZER_PIN        GPIO_PIN_6
 #define BUZZER_PORT       GPIOA
+#define BUZZER_TIMER      TIM3
+#define BUZZER_CHANNEL    TIM_CHANNEL_1
 
 // sh1106 i2c address
 #define SH1106_ADDR      0x3C << 1
@@ -131,6 +133,7 @@ static const uint8_t font_5x7[][5] = {
 // global handles
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
+TIM_HandleTypeDef htim3;  // timer for buzzer pwm
 
 // encoder states
 static volatile int8_t encoder_p1_delta = 0;
@@ -143,6 +146,9 @@ void system_clock_config(void);
 void gpio_init(void);
 void i2c1_init(void);
 void i2c2_init(void);
+void tim3_pwm_init(void);
+void buzzer_on(void);
+void buzzer_off(void);
 void sh1106_init(I2C_HandleTypeDef *hi2c);
 void sh1106_send_command(I2C_HandleTypeDef *hi2c, uint8_t cmd);
 void sh1106_set_position(I2C_HandleTypeDef *hi2c, uint8_t x, uint8_t page);
@@ -166,6 +172,7 @@ int main(void) {
     gpio_init();
     i2c1_init();
     i2c2_init();
+    tim3_pwm_init();  // initialize pwm for buzzer
     
     // initialize displays
     delay_ms(100); // give displays time to power up
@@ -188,14 +195,14 @@ int main(void) {
         //test_displays();
         //delay_ms(5000);
         
-        //test_encoders();
-       // delay_ms(5000);
+        test_encoders();
+        delay_ms(5000);
         
-        test_buttons();
-        delay_ms(30000);
+        //test_buttons();
+        //delay_ms(30000);
         
-        //test_buzzer();
-        //delay_ms(5000);
+        test_buzzer();
+        delay_ms(5000);
     }
 }
 
@@ -214,6 +221,8 @@ void system_clock_config(void) {
     HAL_RCC_OscConfig(&RCC_OscInitStruct);
 
     // configure clocks
+    // hsi = 8mhz -> /2 = 4mhz -> *16 = 64mhz
+    // note: with hsi, max is 64mhz, not 72mhz
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
                                 | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
@@ -263,13 +272,12 @@ void gpio_init(void) {
     GPIO_InitStruct.Pull = GPIO_PULLUP; // external buttons need pull-ups
     HAL_GPIO_Init(P2_BTN2_PORT, &GPIO_InitStruct);
     
-    // buzzer output
+    // buzzer pin (pa6 = tim3_ch1, configured as alternate function for pwm)
     GPIO_InitStruct.Pin = BUZZER_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;  // alternate function push-pull
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(BUZZER_PORT, &GPIO_InitStruct);
-    HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_RESET);
     
     // enable and set exti line interrupts
     HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
@@ -332,6 +340,47 @@ void i2c2_init(void) {
     hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
     HAL_I2C_Init(&hi2c2);
+}
+
+// initialize tim3 for pwm output on pa6 (channel 1)
+void tim3_pwm_init(void) {
+    TIM_OC_InitTypeDef sConfigOC = {0};
+    
+    // enable tim3 clock
+    __HAL_RCC_TIM3_CLK_ENABLE();
+    
+    // configure tim3 base
+    // tim3 is on apb1 at 32mhz, but timers get 2x clock = 64mhz
+    // to get 8.5khz: 64,000,000 / (prescaler * period) = 8,500
+    // using prescaler=10: period = 64,000,000 / (10 * 8,500) = 752.94 ≈ 753
+    // actual frequency: 64,000,000 / (10 * 753) = 8,498.7 hz
+    
+    htim3.Instance = TIM3;
+    htim3.Init.Prescaler = 10 - 1;  // prescaler = 10
+    htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim3.Init.Period = 753 - 1;  // period for 8.5khz
+    htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    HAL_TIM_PWM_Init(&htim3);
+    
+    // configure pwm channel 1 (pa6)
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = (753 * 9 / 10) - 1;  // 90% duty cycle
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, BUZZER_CHANNEL);
+    
+    // note: pwm is not started yet, call buzzer_on() to start it
+}
+
+// turn buzzer on (start pwm)
+void buzzer_on(void) {
+    HAL_TIM_PWM_Start(&htim3, BUZZER_CHANNEL);
+}
+
+// turn buzzer off (stop pwm)
+void buzzer_off(void) {
+    HAL_TIM_PWM_Stop(&htim3, BUZZER_CHANNEL);
 }
 
 // send command to sh1106
@@ -536,7 +585,7 @@ void test_buttons(void) {
     }
 }
 
-// test 4: buzzer test - beep pattern
+// test 4: buzzer test - beep pattern with pwm at 8.5khz
 void test_buzzer(void) {
     sh1106_clear(&hi2c1);
     sh1106_draw_string(&hi2c1, 5, 2, "BUZZER TEST");
@@ -544,11 +593,11 @@ void test_buzzer(void) {
     sh1106_clear(&hi2c2);
     sh1106_draw_string(&hi2c2, 5, 2, "BUZZER TEST");
     
-    // beep 3 times
+    // beep 3 times at 8.5khz
     for (int i = 0; i < 3; i++) {
-        HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_SET);
+        buzzer_on();
         delay_ms(100);
-        HAL_GPIO_WritePin(BUZZER_PORT, BUZZER_PIN, GPIO_PIN_RESET);
+        buzzer_off();
         delay_ms(200);
     }
 }
