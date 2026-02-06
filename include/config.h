@@ -8,6 +8,11 @@
 
 #include "stm32f1xx_hal.h"
 
+// <---- boolean definitions ---->
+
+#define FALSE 0
+#define TRUE  1
+
 // <---- player 1 hardware pin definitions ---->
 
 // player 1 i2c pins for display

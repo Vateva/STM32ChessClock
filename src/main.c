@@ -34,15 +34,22 @@ int main(void) {
     display_clear(&hi2c1);
     display_clear(&hi2c2);
     
-    // test different time values (all show HH:MM:SS format)
-    uint32_t test_times[] = {
-        3661000,  // 01:01:01
-        3599000,  // 00:59:59
-        305000,   // 00:05:05
-        59000,    // 00:00:59
-        10000,    // 00:00:10
-        1000,     // 00:00:01
-        0         // 00:00:00
+    // test different modes with varying times
+    typedef struct {
+        uint8_t readycheck;
+        uint32_t main_time;
+        time_control_mode_t mode;
+        uint32_t bonus_time;
+        const char *description;
+    } test_case_t;
+    
+    test_case_t test_cases[] = {
+        {TRUE, 3661000, TIME_CONTROL_NONE,      0,     "None mode"},
+        {FALSE, 305000,  TIME_CONTROL_INCREMENT, 3000,  "Increment 3s"},
+        {TRUE, 59000,   TIME_CONTROL_DELAY,     2000,  "Delay 2s"},
+        {FALSE, 120000,  TIME_CONTROL_PARTIAL,   5000,  "Partial 5s"},
+        {TRUE, 600000,  TIME_CONTROL_LIMITED,   30000, "Limited 30s"},
+        {FALSE, 180000,  TIME_CONTROL_BYOYOMI,   30000, "Byo-yomi 30s"},
     };
     
     uint8_t test_index = 0;
@@ -57,18 +64,14 @@ int main(void) {
             display_clear(&hi2c1);
             display_clear(&hi2c2);
             
-            display_draw_clock(&hi2c1, test_times[test_index]);
-            display_draw_clock(&hi2c2, test_times[test_index]);
+            test_case_t current = test_cases[test_index];
             
-            // show which test we're on (small text at top)
-            char label[20];
-            sprintf(label, "TEST %d/7", test_index + 1);
-            display_draw_string(&hi2c1, 40, 0, label);
-            display_draw_string(&hi2c2, 40, 0, label);
+            display_draw_clock(&hi2c1, current.main_time, current.mode, current.bonus_time, current.readycheck);
+            display_draw_clock(&hi2c2, current.main_time, current.mode, current.bonus_time, current.readycheck);
             
-            // cycle through test times
+            // cycle through test cases
             test_index++;
-            if (test_index >= 7) {
+            if (test_index >= 6) {
                 test_index = 0;
             }
         }
