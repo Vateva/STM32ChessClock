@@ -23,7 +23,7 @@
 
 // player 1 button pins (all on same port)
 #define PLAYER1_ENCODER_PUSH_PIN         GPIO_PIN_2
-#define PLAYER1_CONFIRM_BUTTON_PIN       GPIO_PIN_3
+#define PLAYER1_MENU_BUTTON_PIN          GPIO_PIN_3
 #define PLAYER1_BACK_BUTTON_PIN          GPIO_PIN_4
 #define PLAYER1_TAP_BUTTON_PIN           GPIO_PIN_15
 #define PLAYER1_BUTTON_PORT              GPIOA
@@ -43,7 +43,7 @@
 
 // player 2 button pins (split across two ports)
 #define PLAYER2_ENCODER_PUSH_PIN         GPIO_PIN_14
-#define PLAYER2_CONFIRM_BUTTON_PIN       GPIO_PIN_15
+#define PLAYER2_MENU_BUTTON_PIN          GPIO_PIN_15
 #define PLAYER2_BUTTON_PORT_B            GPIOB
 #define PLAYER2_BACK_BUTTON_PIN          GPIO_PIN_8
 #define PLAYER2_TAP_BUTTON_PIN           GPIO_PIN_9
@@ -79,19 +79,19 @@
 
 // default time configuration (in milliseconds)
 #define DEFAULT_STARTING_TIME_MS         300000       // 5 minutes
-#define DEFAULT_INCREMENT_MS             0            // no increment
+#define DEFAULT_BONUS_TIME_MS            0            // default increment/delay amount
 
 // time limits (in milliseconds)
 #define MIN_STARTING_TIME_MS             1000         // 1 second minimum
 #define MAX_STARTING_TIME_MS             86400000     // 24 hours maximum
-#define MIN_INCREMENT_MS                 0            // no increment minimum
-#define MAX_INCREMENT_MS                 60000        // 60 seconds maximum
+#define MIN_BONUS_TIME_MS                0            // no bonus time minimum
+#define MAX_BONUS_TIME_MS                60000        // 60 seconds maximum
 
 // time editor configuration
 #define TIME_EDITOR_HOURS_MAX            23           // 0-23 hours
 #define TIME_EDITOR_MINUTES_MAX          59           // 0-59 minutes
 #define TIME_EDITOR_SECONDS_MAX          59           // 0-59 seconds
-#define INCREMENT_EDITOR_SECONDS_MAX     59           // 0-59 seconds
+#define BONUS_TIME_EDITOR_SECONDS_MAX    59           // 0-59 seconds for increment/delay
 
 // <---- encoder configuration ---->
 
@@ -102,7 +102,21 @@
 
 #define BUTTON_ACTIVE_STATE              GPIO_PIN_RESET  // buttons are active-low
 #define BUTTON_DEBOUNCE_TIME_MS          50              // debounce delay
+#define MENU_BUTTON_HOLD_TIME_MS         2000            // hold 2 seconds to enter menu
 
+// <---- time control modes ---->
+
+typedef enum {
+    TIME_CONTROL_NONE,      // no bonus time
+    TIME_CONTROL_INCREMENT, // fischer increment (add X, can accumulate)
+    TIME_CONTROL_DELAY,     // bronstein delay (X second buffer before countdown)
+    TIME_CONTROL_PARTIAL,   // partial increment (add X, capped at turn start time)
+    TIME_CONTROL_LIMITED,   // limited time (must move within X seconds or lose)
+    TIME_CONTROL_BYOYOMI    // byo-yomi (X seconds per move after main time expires)
+} time_control_mode_t;
+
+#define DEFAULT_TIME_CONTROL_MODE        TIME_CONTROL_NONE
+#define TIME_CONTROL_MODE_COUNT          6  // total number of modes
 
 // <---- interrupt priorities ---->
 

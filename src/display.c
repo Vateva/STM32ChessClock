@@ -315,81 +315,43 @@ void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_millisecond
     uint8_t hours = total_seconds / 3600;
     uint8_t minutes = (total_seconds % 3600) / 60;
     uint8_t seconds = total_seconds % 60;
-    uint8_t deciseconds = (time_milliseconds % 1000) / 100;
     
     // start page for clock (centered vertically)
     uint8_t start_page = 2;  // pages 2-4 (middle of 0-7)
     
-    if (time_milliseconds >= 3600000) {
-        // >= 1 hour: format as HH:MM:SS (8 characters)
-        // layout: HH : MM : SS
-        // digit width: 16px, colon width: 6px, spacing: 2px
-        // total: 16+16+2+6+2+16+16+2+6+2+16+16 = 116 pixels
-        // centered: (128-116)/2 = 6 pixels from left
-        
-        uint8_t x = 6;
-        
-        // draw hours
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (hours / 10));
-        x += 16;
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (hours % 10));
-        x += 16 + 2;
-        
-        // draw first colon (two dots vertically centered)
-        display_set_position(i2c_handle, x, start_page + 1);
-        uint8_t colon_data[] = {0x40, 0x00, 0x66, 0x66, 0x00, 0x00};  // two dots pattern
-        HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
-        x += 6 + 2;
-        
-        // draw minutes
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes / 10));
-        x += 16;
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes % 10));
-        x += 16 + 2;
-        
-        // draw second colon
-        display_set_position(i2c_handle, x, start_page + 1);
-        HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
-        x += 6 + 2;
-        
-        // draw seconds
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds / 10));
-        x += 16;
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds % 10));
-        
-    } else {
-        // < 1 hour: format as MM:SS.d (7 characters)
-        // layout: MM : SS . d
-        // total: 16+16+2+6+2+16+16+2+6+2+16 = 100 pixels
-        // centered: (128-100)/2 = 14 pixels from left
-        
-        uint8_t x = 14;
-        
-        // draw minutes
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes / 10));
-        x += 16;
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes % 10));
-        x += 16 + 2;
-        
-        // draw colon
-        display_set_position(i2c_handle, x, start_page + 1);
-        uint8_t colon_data[] = {0x40, 0x00, 0x66, 0x66, 0x00, 0x00};
-        HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
-        x += 6 + 2;
-        
-        // draw seconds
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds / 10));
-        x += 16;
-        display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds % 10));
-        x += 16 + 2;
-        
-        // draw period (dot at bottom)
-        display_set_position(i2c_handle, x, start_page + 2);  // bottom of character
-        uint8_t period_data[] = {0x40, 0x00, 0xC0, 0xC0, 0x00, 0x00};  // dot at bottom
-        HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, period_data, 6, 100);
-        x += 6 + 2;
-        
-        // draw decisecond
-        display_draw_large_character(i2c_handle, x, start_page, '0' + deciseconds);
-    }
+    // format as HH:MM:SS (8 characters)
+    // layout: HH : MM : SS
+    // digit width: 16px, colon width: 6px, spacing: 2px
+    // total: 16+16+2+6+2+16+16+2+6+2+16+16 = 116 pixels
+    // centered: (128-116)/2 = 6 pixels from left
+    
+    uint8_t x = 6;
+    
+    // draw hours
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (hours / 10));
+    x += 16;
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (hours % 10));
+    x += 16 + 2;
+    
+    // draw first colon (two dots vertically centered)
+    display_set_position(i2c_handle, x, start_page + 1);
+    uint8_t colon_data[] = {0x40, 0x00, 0x66, 0x66, 0x00, 0x00};  // two dots pattern
+    HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
+    x += 6 + 2;
+    
+    // draw minutes
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes / 10));
+    x += 16;
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (minutes % 10));
+    x += 16 + 2;
+    
+    // draw second colon
+    display_set_position(i2c_handle, x, start_page + 1);
+    HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
+    x += 6 + 2;
+    
+    // draw seconds
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds / 10));
+    x += 16;
+    display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds % 10));
 }

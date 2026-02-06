@@ -34,15 +34,15 @@ int main(void) {
     display_clear(&hi2c1);
     display_clear(&hi2c2);
     
-    // test different time values to show both formats
+    // test different time values (all show HH:MM:SS format)
     uint32_t test_times[] = {
-        3661500,  // 1:01:01.5 (shows HH:MM:SS format)
-        3599900,  // 59:59.9 (shows MM:SS.d format)
-        305200,   // 5:05.2
-        59900,    // 0:59.9
-        10000,    // 0:10.0
-        1500,     // 0:01.5
-        0         // 0:00.0
+        3661000,  // 01:01:01
+        3599000,  // 00:59:59
+        305000,   // 00:05:05
+        59000,    // 00:00:59
+        10000,    // 00:00:10
+        1000,     // 00:00:01
+        0         // 00:00:00
     };
     
     uint8_t test_index = 0;
