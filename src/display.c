@@ -197,15 +197,9 @@ void display_draw_medium_character(I2C_HandleTypeDef *i2c_handle, uint8_t x_posi
     }
 }
 
-// <---- clock display ---->
+// <---- clock screen elements ---->
 
-void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds, time_control_mode_t mode, uint32_t bonus_time_milliseconds, uint8_t is_ready) {
-    // convert milliseconds to time components
-    uint32_t total_seconds = time_milliseconds / 1000;
-    uint8_t hours = total_seconds / 3600;
-    uint8_t minutes = (total_seconds % 3600) / 60;
-    uint8_t seconds = total_seconds % 60;
-    
+void display_draw_header(I2C_HandleTypeDef *i2c_handle, time_control_mode_t mode, uint32_t bonus_time_milliseconds){
     // convert bonus time to seconds
     uint32_t bonus_seconds = bonus_time_milliseconds / 1000;
     
@@ -255,7 +249,7 @@ void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_millisecond
         else num_digits = 1;
         
         // calculate starting x position for right alignment
-        // each medium char is 8 pixels wide, plus 's' = (num_digits + 1) * 8
+        // each medium char is 8 pixels wide, plus 's' = ((num_digits + 1) * 8)
         uint8_t total_width = (num_digits + 1) * 8;
         uint8_t start_x = 128 - total_width;
         uint8_t current_x = start_x;
@@ -275,7 +269,15 @@ void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_millisecond
         // draw 's' suffix
         display_draw_medium_character(i2c_handle, current_x, 0, 's');
     }
-    
+}
+
+void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds) {
+    // convert milliseconds to time components
+    uint32_t total_seconds = time_milliseconds / 1000;
+    uint8_t hours = total_seconds / 3600;
+    uint8_t minutes = (total_seconds % 3600) / 60;
+    uint8_t seconds = total_seconds % 60;
+
     // draw large clock centered (shifted down to page 3-5 to make room for header)
     uint8_t start_page = 3;  // pages 3-5 (shifted down from 2-4)
     
@@ -315,10 +317,25 @@ void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_millisecond
     x += 16;
     display_draw_large_character(i2c_handle, x, start_page, '0' + (seconds % 10));
     
+}
+
+void display_draw_footer(I2C_HandleTypeDef *i2c_handle, uint8_t is_ready){
+
     // draw "Ready!" below clock if player is ready
     if (is_ready) {
         // "Ready!" is 6 characters × 6 pixels = 36 pixels wide
         // center on 128 pixel display: (128-36)/2 = 46 pixels from left
         display_draw_string(i2c_handle, 46, 7, "Ready!");
     }
+
+}
+void display_draw_clock_screen(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds, time_control_mode_t mode, uint32_t bonus_time_millisecond, uint8_t is_ready){
+
+    display_draw_header(i2c_handle, mode, bonus_time_millisecond);
+
+    display_draw_clock(i2c_handle, time_milliseconds);
+
+    display_draw_footer(i2c_handle, is_ready);
+
+
 }

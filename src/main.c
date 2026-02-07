@@ -52,12 +52,12 @@ int main(void) {
         {FALSE, 180000,  TIME_CONTROL_BYOYOMI,   30000, "Byo-yomi 30s"},
     };
     
-    uint8_t test_index = 0;
+    uint8_t test_index = 4;
     uint32_t last_update = 0;
     
     while (1) {
         // update display every 2 seconds
-        if ((HAL_GetTick() - last_update) >= 2000) {
+        if ((HAL_GetTick() - last_update) >= 10000) {
             last_update = HAL_GetTick();
             
             // clear and draw new time
@@ -66,8 +66,8 @@ int main(void) {
             
             test_case_t current = test_cases[test_index];
             
-            display_draw_clock(&hi2c1, current.main_time, current.mode, current.bonus_time, current.readycheck);
-            display_draw_clock(&hi2c2, current.main_time, current.mode, current.bonus_time, current.readycheck);
+            display_draw_clock_screen(&hi2c1, current.main_time, current.mode, current.bonus_time, current.readycheck);
+            display_draw_clock_screen(&hi2c2, current.main_time, current.mode, current.bonus_time, current.readycheck);
             
             // cycle through test cases
             test_index++;

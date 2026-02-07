@@ -44,6 +44,7 @@ void display_set_position(I2C_HandleTypeDef *i2c_handle, uint8_t x_position, uin
 /**
  * draw single character at specified position
  * uses 5x7 pixel font
+ * used for all text(menu+mode+"Ready!")
  * 
  * @param i2c_handle pointer to i2c handle for this display
  * @param x_position horizontal position in pixels (0-127)
@@ -68,6 +69,7 @@ void display_draw_string(I2C_HandleTypeDef *i2c_handle, uint8_t x_position, uint
  * draw large character at specified position
  * uses 16x24 pixel font, spans 3 pages vertically
  * supports digits 0-9, colon, and period
+ * used for clock
  * 
  * @param i2c_handle pointer to i2c handle for this display
  * @param x_position horizontal position in pixels (0-127)
@@ -80,6 +82,7 @@ void display_draw_large_character(I2C_HandleTypeDef *i2c_handle, uint8_t x_posit
  * draw medium character at specified position
  * uses 8x16 pixel font, spans 2 pages vertically
  * supports digits 0-9 and 's'
+ * used for bonus time
  * 
  * @param i2c_handle pointer to i2c handle for this display
  * @param x_position horizontal position in pixels (0-127)
@@ -88,13 +91,41 @@ void display_draw_large_character(I2C_HandleTypeDef *i2c_handle, uint8_t x_posit
  */
 void display_draw_medium_character(I2C_HandleTypeDef *i2c_handle, uint8_t x_position, uint8_t start_page, char character);
 
-// <---- clock display ---->
+// <---- clock screen elements ---->
 
 /**
- * draw time as large centered clock with mode header
- * always displays HH:MM:SS format
+ * draw mode header
  * shows mode name on top left and bonus time on top right
- * optionally shows "Ready!" below clock when player is ready
+ * 
+ * @param i2c_handle pointer to i2c handle for this display
+ * @param mode time control mode (for header label)
+ * @param bonus_time_milliseconds bonus time to display (seconds value in top right)
+ */
+
+void display_draw_header(I2C_HandleTypeDef *i2c_handle, time_control_mode_t mode, uint32_t bonus_time_milliseconds);
+
+/**
+ * draw time as large centered clock
+ * always displays HH:MM:SS format
+ * 
+ * @param i2c_handle pointer to i2c handle for this display
+ * @param time_milliseconds main time to display in milliseconds
+ */
+void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds);
+
+/**
+ * draw ready footer
+ * draws "Ready!" under a players clock when ready
+ * 
+ * @param i2c_handle pointer to i2c handle for this display
+ * @param is_ready if TRUE, displays "Ready!" below the clock
+ */
+void display_draw_footer(I2C_HandleTypeDef *i2c_handle, uint8_t is_ready);
+
+/**
+ * draw full clock screen
+ * calls display_draw_header and display_draw_clock
+ * header + clock + footer
  * 
  * @param i2c_handle pointer to i2c handle for this display
  * @param time_milliseconds main time to display in milliseconds
@@ -102,7 +133,7 @@ void display_draw_medium_character(I2C_HandleTypeDef *i2c_handle, uint8_t x_posi
  * @param bonus_time_milliseconds bonus time to display (seconds value in top right)
  * @param is_ready if TRUE, displays "Ready!" below the clock
  */
-void display_draw_clock(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds, time_control_mode_t mode, uint32_t bonus_time_milliseconds, uint8_t is_ready);
+void display_draw_clock_screen(I2C_HandleTypeDef *i2c_handle, uint32_t time_milliseconds, time_control_mode_t mode, uint32_t bonus_time_millisecond, uint8_t is_ready);
 
 // <---- low-level communication ---->
 
