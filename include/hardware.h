@@ -1,5 +1,5 @@
 /*
- * hardware abstraction layer for chess clock
+ * hardware module
  * handles all low-level hardware initialization and control
  */
 
@@ -88,4 +88,4 @@ I2C_HandleTypeDef* hardware_get_i2c1(void);
  */
 I2C_HandleTypeDef* hardware_get_i2c2(void);
 
-#endif // HARDWARE_H
+#endif  // HARDWARE_H

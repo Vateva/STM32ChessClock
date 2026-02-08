@@ -1,5 +1,5 @@
 /*
- * configuration file for chess clock
+ * configuration file for the chess clock
  * contains all pin definitions, hardware addresses, and configurable parameters
  */
 
