@@ -71,7 +71,7 @@
 // <---- timing configuration ---->
 
 // system clock configuration
-#define SYSTEM_CLOCK_FREQUENCY_MHZ       64           // using hsi oscillator
+#define SYSTEM_CLOCK_FREQUENCY_MHZ       8           // using hsi oscillator
 
 // timer configuration for buzzer pwm
 #define BUZZER_PWM_FREQUENCY_HZ          8500         // resonant frequency of piezo
