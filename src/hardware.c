@@ -58,18 +58,25 @@ void hardware_init_system_clock(void) {
 void hardware_init_gpio(void) {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  // enable gpio clocks
+  // enable gpio and afio clocks (afio needed for exti on stm32f1)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_AFIO_CLK_ENABLE();
 
   // <---- player 1 gpio configuration ---->
 
-  // player 1 encoder pins (input with pull-up)
+  // player 1 encoder pins (exti on both edges for interrupt-driven quadrature decoding)
   GPIO_InitStruct.Pin = PLAYER1_ENCODER_A_PIN | PLAYER1_ENCODER_B_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(PLAYER1_ENCODER_PORT, &GPIO_InitStruct);
+
+  // enable exti interrupts for player 1 encoder (pa0 -> exti0, pa1 -> exti1)
+  HAL_NVIC_SetPriority(EXTI0_IRQn, ENCODER_INTERRUPT_PRIORITY, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, ENCODER_INTERRUPT_PRIORITY, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
   // player 1 button pins (input with pull-up, buttons are active-low)
   GPIO_InitStruct.Pin =
@@ -81,12 +88,16 @@ void hardware_init_gpio(void) {
 
   // <---- player 2 gpio configuration ---->
 
-  // player 2 encoder pins (input with pull-up)
+  // player 2 encoder pins (exti on both edges for interrupt-driven quadrature decoding)
   GPIO_InitStruct.Pin = PLAYER2_ENCODER_A_PIN | PLAYER2_ENCODER_B_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(PLAYER2_ENCODER_PORT, &GPIO_InitStruct);
+
+  // enable exti interrupts for player 2 encoder (pb12 + pb13 -> shared exti15_10)
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, ENCODER_INTERRUPT_PRIORITY, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   // player 2 button pins on port b (input with pull-up)
   GPIO_InitStruct.Pin = PLAYER2_ENCODER_PUSH_PIN | PLAYER2_MENU_BUTTON_PIN;

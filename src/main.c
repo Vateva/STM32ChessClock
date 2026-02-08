@@ -1,153 +1,225 @@
 /*
- * minimal test program for display clock function
- * displays a countdown timer using the large font
+ * test program for chess clock hardware
+ * tests display, buttons, encoders, and buzzer
  */
 
-#include "config.h"
-#include "display.h"
 #include "stm32f1xx_hal.h"
+#include "config.h"
+#include "hardware.h"
+#include "display.h"
+#include "button.h"
+#include "encoder.h"
+#include <stdio.h>
+#include <string.h>
 
-// global i2c handles
-I2C_HandleTypeDef hi2c1;
-I2C_HandleTypeDef hi2c2;
+// encoder positions for testing
+static int32_t encoder1_position = 0;
+static int32_t encoder2_position = 0;
+
+// raw transition counters for debug
+static int32_t encoder1_raw_count = 0;
+static int32_t encoder2_raw_count = 0;
+
+// last pressed button name
+static const char* last_button_name = "NONE";
+
+// button name lookup table
+static const char* button_names[BUTTON_COUNT] = {
+    "P1_ENC_PUSH",
+    "P1_MENU",
+    "P1_BACK",
+    "P1_TAP",
+    "P2_ENC_PUSH",
+    "P2_MENU",
+    "P2_BACK",
+    "P2_TAP"
+};
 
 // function prototypes
 void system_clock_config(void);
-void i2c_init(void);
+void test_buttons(void);
+void test_encoders(void);
+void update_display(I2C_HandleTypeDef *i2c, int32_t enc_pos, const char *btn_name);
 
 int main(void) {
-  // initialize hal
-  HAL_Init();
-
-  // configure system clock to 64mhz (using hsi)
-  system_clock_config();
-
-  // initialize i2c
-  i2c_init();
-
-  // initialize displays
-  HAL_Delay(100);
-  display_init(&hi2c1);
-  display_init(&hi2c2);
-
-  // clear displays
-  display_clear(&hi2c1);
-  display_clear(&hi2c2);
-
-  // test different modes with varying times
-  typedef struct {
-    uint8_t readycheck;
-    uint32_t main_time;
-    time_control_mode_t mode;
-    uint32_t bonus_time;
-    const char* description;
-  } test_case_t;
-
-  test_case_t test_cases[] = {
-      {TRUE, 3661000, TIME_CONTROL_NONE, 0, "None mode"},
-      {FALSE, 305000, TIME_CONTROL_INCREMENT, 3000, "Increment 3s"},
-      {TRUE, 59000, TIME_CONTROL_DELAY, 2000, "Delay 2s"},
-      {FALSE, 120000, TIME_CONTROL_PARTIAL, 5000, "Partial 5s"},
-      {TRUE, 600000, TIME_CONTROL_LIMITED, 30000, "Limited 30s"},
-      {FALSE, 180000, TIME_CONTROL_BYOYOMI, 30000, "Byo-yomi 30s"},
-  };
-
-  uint8_t test_index = 0;
-  uint32_t last_update = 0;
-
-  while (1) {
-    // update display every 2 seconds
-    if ((HAL_GetTick() - last_update) >= 3000) {
-      last_update = HAL_GetTick();
-
-      // clear and draw new time
-      display_clear(&hi2c1);
-      display_clear(&hi2c2);
-
-      test_case_t current = test_cases[test_index];
-
-      display_draw_clock_screen(&hi2c1, current.main_time, current.mode, current.bonus_time, current.readycheck);
-      display_draw_clock_screen(&hi2c2, current.main_time, current.mode, current.bonus_time, current.readycheck);
-
-      // cycle through test cases
-      test_index++;
-      if (test_index >= 6) {
-        test_index = 0;
-      }
+    // initialize hal
+    HAL_Init();
+    
+    // initialize all hardware
+    hardware_init();
+    
+    // initialize modules
+    button_init();
+    encoder_init();
+    
+    // get i2c handles
+    I2C_HandleTypeDef *i2c1 = hardware_get_i2c1();
+    I2C_HandleTypeDef *i2c2 = hardware_get_i2c2();
+    
+    // initialize displays
+    HAL_Delay(100);
+    display_init(i2c1);
+    display_init(i2c2);
+    
+    // clear displays
+    display_clear(i2c1);
+    display_clear(i2c2);
+    
+    // clear displays and show static text once
+    display_clear(i2c1);
+    display_clear(i2c2);
+    display_draw_string(i2c1, 0, 2, "Hardware Test");
+    display_draw_string(i2c1, 0, 3, "Press buttons");
+    display_draw_string(i2c1, 0, 4, "Turn encoders");
+    display_draw_string(i2c2, 0, 2, "Hardware Test");
+    display_draw_string(i2c2, 0, 3, "Press buttons");
+    display_draw_string(i2c2, 0, 4, "Turn encoders");
+    
+    // show initial dynamic text
+    update_display(i2c1, 0, "NONE");
+    update_display(i2c2, 0, "NONE");
+    
+    // track previous values to detect changes
+    int32_t last_enc1_pos = 0;
+    int32_t last_enc2_pos = 0;
+    int32_t last_enc1_raw = 0;
+    int32_t last_enc2_raw = 0;
+    const char* last_displayed_button = "NONE";
+    uint8_t display_needs_update = FALSE;
+    
+    // main test loop
+    while (1) {
+        // update button states (encoder is now interrupt-driven, no polling needed)
+        button_update();
+        
+        // test buttons
+        test_buttons();
+        
+        // test encoders
+        test_encoders();
+        
+        // check if display needs updating (data changed)
+        if (encoder1_position != last_enc1_pos || 
+            encoder2_position != last_enc2_pos ||
+            encoder1_raw_count != last_enc1_raw ||
+            encoder2_raw_count != last_enc2_raw ||
+            last_button_name != last_displayed_button) {
+            
+            display_needs_update = TRUE;
+            last_enc1_pos = encoder1_position;
+            last_enc2_pos = encoder2_position;
+            last_enc1_raw = encoder1_raw_count;
+            last_enc2_raw = encoder2_raw_count;
+            last_displayed_button = last_button_name;
+        }
+        
+        // update displays only when needed (no full clear, just update changed lines)
+        static uint32_t last_display_update = 0;
+        if (display_needs_update && (HAL_GetTick() - last_display_update) >= 100) {
+            last_display_update = HAL_GetTick();
+            display_needs_update = FALSE;
+            
+            // only update dynamic parts (no full clear)
+            update_display(i2c1, encoder1_position, last_button_name);
+            update_display(i2c2, encoder2_position, last_button_name);
+        }
+        
+        // small delay to prevent cpu spinning too fast
+        HAL_Delay(1);
     }
-  }
 }
 
-// configure system clock to 64mhz using internal oscillator
-void system_clock_config(void) {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-
-  // configure pll using hsi
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
-  HAL_RCC_OscConfig(&RCC_OscInitStruct);
-
-  // configure clocks (hsi: 8mhz -> /2 = 4mhz -> *16 = 64mhz)
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;  // 64mhz
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;   // 32mhz
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;   // 64mhz
-  HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
+void test_buttons(void) {
+    // check all buttons
+    for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
+        if (button_was_pressed((button_id_t)i)) {
+            // update last button name
+            last_button_name = button_names[i];
+            
+            // if menu button pressed, toggle buzzer
+            if (i == BUTTON_PLAYER1_MENU || i == BUTTON_PLAYER2_MENU) {
+                hardware_buzzer_on();
+                HAL_Delay(100);  // beep for 100ms
+                hardware_buzzer_off();
+            }
+        }
+    }
 }
 
-// initialize both i2c peripherals
-void i2c_init(void) {
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
+void test_encoders(void) {
+    // read encoder deltas (in quadrature transitions)
+    int8_t delta1 = encoder_get_delta(ENCODER_PLAYER1);
+    int8_t delta2 = encoder_get_delta(ENCODER_PLAYER2);
+    
+    // track raw transitions for debug
+    encoder1_raw_count += delta1;
+    encoder2_raw_count += delta2;
+    
+    // convert from transitions to clicks (4 transitions per click)
+    // accumulate fractional clicks
+    static int8_t frac1 = 0;
+    static int8_t frac2 = 0;
+    
+    frac1 += delta1;
+    frac2 += delta2;
+    
+    // only update position when we have a full click (4 transitions)
+    if (frac1 >= 4) {
+        encoder1_position++;
+        frac1 -= 4;
+    } else if (frac1 <= -4) {
+        encoder1_position--;
+        frac1 += 4;
+    }
+    
+    if (frac2 >= 4) {
+        encoder2_position++;
+        frac2 -= 4;
+    } else if (frac2 <= -4) {
+        encoder2_position--;
+        frac2 += 4;
+    }
+}
 
-  // enable clocks
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_I2C1_CLK_ENABLE();
-  __HAL_RCC_I2C2_CLK_ENABLE();
-
-  // configure i2c1 pins (pb6=scl, pb7=sda)
-  GPIO_InitStruct.Pin = PLAYER1_I2C_SCL_PIN | PLAYER1_I2C_SDA_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(PLAYER1_I2C_PORT, &GPIO_InitStruct);
-
-  // configure i2c1
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 400000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  HAL_I2C_Init(&hi2c1);
-
-  // configure i2c2 pins (pb10=scl, pb11=sda)
-  GPIO_InitStruct.Pin = PLAYER2_I2C_SCL_PIN | PLAYER2_I2C_SDA_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(PLAYER2_I2C_PORT, &GPIO_InitStruct);
-
-  // configure i2c2
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.ClockSpeed = 400000;
-  hi2c2.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c2.Init.OwnAddress1 = 0;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  HAL_I2C_Init(&hi2c2);
+void update_display(I2C_HandleTypeDef *i2c, int32_t enc_pos, const char *btn_name) {
+    char buffer[32];
+    
+    // clear only the lines we're updating (page 0, 1, and 5 for debug)
+    // clear page 0 (button line)
+    display_set_position(i2c, 0, 0);
+    uint8_t clear_data[129];
+    clear_data[0] = 0x40;  // data mode
+    for (int i = 1; i < 129; i++) {
+        clear_data[i] = 0x00;
+    }
+    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
+    
+    // clear page 1 (encoder clicks line)
+    display_set_position(i2c, 0, 1);
+    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
+    
+    // clear page 5 (raw transitions debug line)
+    display_set_position(i2c, 0, 5);
+    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
+    
+    // show last button pressed on page 0
+    snprintf(buffer, sizeof(buffer), "Btn: %s", btn_name);
+    display_draw_string(i2c, 0, 0, buffer);
+    
+    // show encoder clicks on page 1
+    snprintf(buffer, sizeof(buffer), "Clicks: %ld", enc_pos);
+    display_draw_string(i2c, 0, 1, buffer);
+    
+    // show raw transitions on page 5 (debug)
+    if (i2c == hardware_get_i2c1()) {
+        snprintf(buffer, sizeof(buffer), "Raw: %ld", encoder1_raw_count);
+    } else {
+        snprintf(buffer, sizeof(buffer), "Raw: %ld", encoder2_raw_count);
+    }
+    display_draw_string(i2c, 0, 5, buffer);
 }
 
 // required for hal
 void SysTick_Handler(void) {
-  HAL_IncTick();
+    HAL_IncTick();
 }

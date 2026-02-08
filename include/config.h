@@ -101,7 +101,8 @@
 // <---- encoder configuration ---->
 
 #define ENCODER_CLICKS_PER_ROTATION      20           // physical detents per full rotation
-#define ENCODER_PULSES_PER_CLICK         2            // quadrature pulses per click
+#define ENCODER_PULSES_PER_CLICK         4            // quadrature pulses per click
+#define ENCODER_DEBOUNCE_TIME_MS         5            // minimum ms between state changes
 
 // <---- button configuration ---->
 
