@@ -124,6 +124,21 @@ typedef enum {
 #define DEFAULT_TIME_CONTROL_MODE        TIME_CONTROL_NONE
 #define TIME_CONTROL_MODE_COUNT          6  // total number of modes
 
+// <---- player configuration (shared between game and menu modules) ---->
+
+// per-player settings configured via menu, used as template for new games
+typedef struct {
+    uint32_t starting_time_ms;              // configured starting time in milliseconds
+    time_control_mode_t time_control_mode;  // selected time control mode
+    uint32_t bonus_time_ms;                 // configured bonus time for the selected mode
+} player_config_t;
+
+// <---- menu configuration ---->
+
+#define MENU_SAVE_FEEDBACK_DURATION_MS   500  // "Saved!" display duration
+#define MENU_BLINK_INTERVAL_MS           300  // blink rate for editing fields
+#define ENCODER_LONG_PRESS_TIME_MS       1000 // long press encoder to save in time editor
+
 // <---- interrupt priorities ---->
 
 #define ENCODER_INTERRUPT_PRIORITY       5            // encoder gpio exti priority

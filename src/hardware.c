@@ -277,6 +277,12 @@ void hardware_buzzer_off(void) {
   HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
 }
 
+// <---- timer handle access ---->
+
+TIM_HandleTypeDef* hardware_get_tim2(void) {
+  return &htim2;
+}
+
 // <---- i2c handle getters ---->
 
 I2C_HandleTypeDef* hardware_get_i2c1(void) {

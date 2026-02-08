@@ -1,6 +1,18 @@
 /*
- * test program for chess clock hardware
- * tests display, buttons, encoders, and buzzer
+ * test program for game state machine
+ * tests phase transitions, clock countdown, time controls, and buzzer
+ *
+ * temporary workaround: back button simulates menu "Ready!" selection
+ * since menu module is not yet implemented
+ *
+ * test flow:
+ *   1. power on -> armed (both displays show 05:00:00 + "Ready!")
+ *   2. tap either player's button -> running (other player's clock starts)
+ *   3. active player taps -> switch turns (time control applied)
+ *   4. clock reaches 0 -> finished (buzzer beeps, loser blinks)
+ *   5. tap any button -> armed (reset to defaults)
+ *   6. hold menu button -> that player enters menu (display cleared with "IN MENU")
+ *   7. press back button -> simulates "Ready!" (exits menu)
  */
 
 #include "stm32f1xx_hal.h"
@@ -9,217 +21,107 @@
 #include "display.h"
 #include "button.h"
 #include "encoder.h"
-#include <stdio.h>
-#include <string.h>
+#include "game.h"
 
-// encoder positions for testing
-static int32_t encoder1_position = 0;
-static int32_t encoder2_position = 0;
+// <---- temporary menu simulation ---->
 
-// raw transition counters for debug
-static int32_t encoder1_raw_count = 0;
-static int32_t encoder2_raw_count = 0;
-
-// last pressed button name
-static const char* last_button_name = "NONE";
-
-// button name lookup table
-static const char* button_names[BUTTON_COUNT] = {
-    "P1_ENC_PUSH",
-    "P1_MENU",
-    "P1_BACK",
-    "P1_TAP",
-    "P2_ENC_PUSH",
-    "P2_MENU",
-    "P2_BACK",
-    "P2_TAP"
+// back button ids for each player, used to simulate menu "Ready!"
+static const button_id_t back_buttons[PLAYER_COUNT] = {
+    BUTTON_PLAYER1_BACK,
+    BUTTON_PLAYER2_BACK
 };
 
-// function prototypes
-void system_clock_config(void);
-void test_buttons(void);
-void test_encoders(void);
-void update_display(I2C_HandleTypeDef *i2c, int32_t enc_pos, const char *btn_name);
+// temporary: draw a simple "in menu" placeholder on a player's display
+static void draw_menu_placeholder(player_id_t player) {
+    I2C_HandleTypeDef* i2c;
+    if (player == PLAYER_1) {
+        i2c = hardware_get_i2c1();
+    } else {
+        i2c = hardware_get_i2c2();
+    }
+
+    display_clear(i2c);
+    display_draw_string(i2c, 30, 3, "IN MENU");
+    display_draw_string(i2c, 12, 5, "BACK = Ready!");
+}
+
+// tracks whether we already drew the placeholder to avoid redrawing every loop
+static uint8_t menu_placeholder_drawn[PLAYER_COUNT] = {FALSE, FALSE};
+
+// temporary: check back buttons to simulate menu "Ready!" selection
+// also draws placeholder when player first enters menu
+static void simulate_menu(void) {
+    for (uint8_t i = 0; i < PLAYER_COUNT; i++) {
+        player_state_t* ps = game_get_player_state((player_id_t)i);
+
+        if (ps->in_menu) {
+            // draw placeholder once when entering menu
+            if (!menu_placeholder_drawn[i]) {
+                draw_menu_placeholder((player_id_t)i);
+                menu_placeholder_drawn[i] = TRUE;
+            }
+
+            // back button simulates selecting "Ready!"
+            if (button_was_pressed(back_buttons[i])) {
+                game_player_ready((player_id_t)i);
+                menu_placeholder_drawn[i] = FALSE;
+            }
+        } else {
+            menu_placeholder_drawn[i] = FALSE;
+        }
+    }
+}
+
+// <---- interrupt handlers ---->
+
+// systick handler: required for hal timing (HAL_GetTick, HAL_Delay)
+void SysTick_Handler(void) {
+    HAL_IncTick();
+}
+
+// tim2 handler: fires every 100ms, decrements active player's clock
+void TIM2_IRQHandler(void) {
+    HAL_TIM_IRQHandler(hardware_get_tim2());
+    game_tick();
+}
+
+// <---- main ---->
 
 int main(void) {
     // initialize hal
     HAL_Init();
-    
-    // initialize all hardware
+
+    // initialize all hardware subsystems
     hardware_init();
-    
-    // initialize modules
+
+    // initialize input modules
     button_init();
     encoder_init();
-    
-    // get i2c handles
-    I2C_HandleTypeDef *i2c1 = hardware_get_i2c1();
-    I2C_HandleTypeDef *i2c2 = hardware_get_i2c2();
-    
+
     // initialize displays
+    I2C_HandleTypeDef* i2c1 = hardware_get_i2c1();
+    I2C_HandleTypeDef* i2c2 = hardware_get_i2c2();
     HAL_Delay(100);
     display_init(i2c1);
     display_init(i2c2);
-    
-    // clear displays
     display_clear(i2c1);
     display_clear(i2c2);
-    
-    // clear displays and show static text once
-    display_clear(i2c1);
-    display_clear(i2c2);
-    display_draw_string(i2c1, 0, 2, "Hardware Test");
-    display_draw_string(i2c1, 0, 3, "Press buttons");
-    display_draw_string(i2c1, 0, 4, "Turn encoders");
-    display_draw_string(i2c2, 0, 2, "Hardware Test");
-    display_draw_string(i2c2, 0, 3, "Press buttons");
-    display_draw_string(i2c2, 0, 4, "Turn encoders");
-    
-    // show initial dynamic text
-    update_display(i2c1, 0, "NONE");
-    update_display(i2c2, 0, "NONE");
-    
-    // track previous values to detect changes
-    int32_t last_enc1_pos = 0;
-    int32_t last_enc2_pos = 0;
-    int32_t last_enc1_raw = 0;
-    int32_t last_enc2_raw = 0;
-    const char* last_displayed_button = "NONE";
-    uint8_t display_needs_update = FALSE;
-    
-    // main test loop
+
+    // initialize game module (starts in armed with defaults)
+    game_init();
+
+    // main loop
     while (1) {
-        // update button states (encoder is now interrupt-driven, no polling needed)
+        // poll button states
         button_update();
-        
-        // test buttons
-        test_buttons();
-        
-        // test encoders
-        test_encoders();
-        
-        // check if display needs updating (data changed)
-        if (encoder1_position != last_enc1_pos || 
-            encoder2_position != last_enc2_pos ||
-            encoder1_raw_count != last_enc1_raw ||
-            encoder2_raw_count != last_enc2_raw ||
-            last_button_name != last_displayed_button) {
-            
-            display_needs_update = TRUE;
-            last_enc1_pos = encoder1_position;
-            last_enc2_pos = encoder2_position;
-            last_enc1_raw = encoder1_raw_count;
-            last_enc2_raw = encoder2_raw_count;
-            last_displayed_button = last_button_name;
-        }
-        
-        // update displays only when needed (no full clear, just update changed lines)
-        static uint32_t last_display_update = 0;
-        if (display_needs_update && (HAL_GetTick() - last_display_update) >= 100) {
-            last_display_update = HAL_GetTick();
-            display_needs_update = FALSE;
-            
-            // only update dynamic parts (no full clear)
-            update_display(i2c1, encoder1_position, last_button_name);
-            update_display(i2c2, encoder2_position, last_button_name);
-        }
-        
+
+        // temporary: handle menu simulation with back buttons
+        simulate_menu();
+
+        // run game state machine (input handling, transitions, display)
+        game_update();
+
         // small delay to prevent cpu spinning too fast
         HAL_Delay(1);
     }
-}
-
-void test_buttons(void) {
-    // check all buttons
-    for (uint8_t i = 0; i < BUTTON_COUNT; i++) {
-        if (button_was_pressed((button_id_t)i)) {
-            // update last button name
-            last_button_name = button_names[i];
-            
-            // if menu button pressed, toggle buzzer
-            if (i == BUTTON_PLAYER1_MENU || i == BUTTON_PLAYER2_MENU) {
-                hardware_buzzer_on();
-                HAL_Delay(100);  // beep for 100ms
-                hardware_buzzer_off();
-            }
-        }
-    }
-}
-
-void test_encoders(void) {
-    // read encoder deltas (in quadrature transitions)
-    int8_t delta1 = encoder_get_delta(ENCODER_PLAYER1);
-    int8_t delta2 = encoder_get_delta(ENCODER_PLAYER2);
-    
-    // track raw transitions for debug
-    encoder1_raw_count += delta1;
-    encoder2_raw_count += delta2;
-    
-    // convert from transitions to clicks (4 transitions per click)
-    // accumulate fractional clicks
-    static int8_t frac1 = 0;
-    static int8_t frac2 = 0;
-    
-    frac1 += delta1;
-    frac2 += delta2;
-    
-    // only update position when we have a full click (4 transitions)
-    if (frac1 >= 4) {
-        encoder1_position++;
-        frac1 -= 4;
-    } else if (frac1 <= -4) {
-        encoder1_position--;
-        frac1 += 4;
-    }
-    
-    if (frac2 >= 4) {
-        encoder2_position++;
-        frac2 -= 4;
-    } else if (frac2 <= -4) {
-        encoder2_position--;
-        frac2 += 4;
-    }
-}
-
-void update_display(I2C_HandleTypeDef *i2c, int32_t enc_pos, const char *btn_name) {
-    char buffer[32];
-    
-    // clear only the lines we're updating (page 0, 1, and 5 for debug)
-    // clear page 0 (button line)
-    display_set_position(i2c, 0, 0);
-    uint8_t clear_data[129];
-    clear_data[0] = 0x40;  // data mode
-    for (int i = 1; i < 129; i++) {
-        clear_data[i] = 0x00;
-    }
-    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
-    
-    // clear page 1 (encoder clicks line)
-    display_set_position(i2c, 0, 1);
-    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
-    
-    // clear page 5 (raw transitions debug line)
-    display_set_position(i2c, 0, 5);
-    HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
-    
-    // show last button pressed on page 0
-    snprintf(buffer, sizeof(buffer), "Btn: %s", btn_name);
-    display_draw_string(i2c, 0, 0, buffer);
-    
-    // show encoder clicks on page 1
-    snprintf(buffer, sizeof(buffer), "Clicks: %ld", enc_pos);
-    display_draw_string(i2c, 0, 1, buffer);
-    
-    // show raw transitions on page 5 (debug)
-    if (i2c == hardware_get_i2c1()) {
-        snprintf(buffer, sizeof(buffer), "Raw: %ld", encoder1_raw_count);
-    } else {
-        snprintf(buffer, sizeof(buffer), "Raw: %ld", encoder2_raw_count);
-    }
-    display_draw_string(i2c, 0, 5, buffer);
-}
-
-// required for hal
-void SysTick_Handler(void) {
-    HAL_IncTick();
 }

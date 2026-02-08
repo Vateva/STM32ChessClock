@@ -74,6 +74,16 @@ void hardware_buzzer_on(void);
  */
 void hardware_buzzer_off(void);
 
+// <---- timer handle access ---->
+
+/**
+ * get tim2 handle for clock tick timer
+ * needed by main.c for the TIM2 interrupt handler
+ *
+ * @return pointer to tim2 handle
+ */
+TIM_HandleTypeDef* hardware_get_tim2(void);
+
 // <---- i2c handle access ---->
 
 /**
