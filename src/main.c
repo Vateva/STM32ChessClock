@@ -71,10 +71,22 @@ static void process_menu_result(player_id_t player) {
     menu_action_t action = menu_update((uint8_t)player);
 
     switch (action) {
-        case MENU_ACTION_READY:
-            // player selected "Ready!" — tell game module
+        case MENU_ACTION_READY: {
+            // sync live bonus to match whatever mode was selected in menu
+            player_state_t* ps = game_get_player_state(player);
+            time_control_mode_t active_mode = ps->config.time_control_mode;
+
+            if (active_mode == TIME_CONTROL_DELAY ||
+                active_mode == TIME_CONTROL_LIMITED ||
+                active_mode == TIME_CONTROL_BYOYOMI) {
+                // countdown modes use a live bonus timer
+                ps->current_bonus_ms = ps->config.bonus_time_ms[active_mode];
+            }
+
+            // tell game module player is ready
             game_player_ready(player);
             break;
+        }
 
         case MENU_ACTION_RESET:
             // player confirmed reset — tell game module

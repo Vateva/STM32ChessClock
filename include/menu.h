@@ -87,8 +87,7 @@ typedef struct {
     uint8_t is_paused;                  // determines which menu variant to show
     uint8_t item_count;                 // number of items in main menu
 
-    // display state
-    uint8_t needs_full_redraw;          // flag to force full screen redraw
+    // save feedback state
     uint32_t save_feedback_timestamp;   // when "Saved!" was shown
 } menu_state_t;
 
