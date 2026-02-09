@@ -1,18 +1,7 @@
 /*
- * test program for game state machine
- * tests phase transitions, clock countdown, time controls, and buzzer
- *
- * temporary workaround: back button simulates menu "Ready!" selection
- * since menu module is not yet implemented
- *
- * test flow:
- *   1. power on -> armed (both displays show 05:00:00 + "Ready!")
- *   2. tap either player's button -> running (other player's clock starts)
- *   3. active player taps -> switch turns (time control applied)
- *   4. clock reaches 0 -> finished (buzzer beeps, loser blinks)
- *   5. tap any button -> armed (reset to defaults)
- *   6. hold menu button -> that player enters menu (display cleared with "IN MENU")
- *   7. press back button -> simulates "Ready!" (exits menu)
+ * chess clock main program
+ * wires together game and menu modules
+ * acts as coordinator — neither module knows about the other
  */
 
 #include "stm32f1xx_hal.h"
@@ -22,53 +11,101 @@
 #include "button.h"
 #include "encoder.h"
 #include "game.h"
+#include "menu.h"
 
-// <---- temporary menu simulation ---->
+// <---- internal helper: open menu for a player ---->
 
-// back button ids for each player, used to simulate menu "Ready!"
-static const button_id_t back_buttons[PLAYER_COUNT] = {
-    BUTTON_PLAYER1_BACK,
-    BUTTON_PLAYER2_BACK
-};
+// reads game state and passes the right pointers to the menu module
+static void open_menu_for_player(player_id_t player) {
+    player_state_t* ps = game_get_player_state(player);
+    game_phase_t phase = game_get_phase();
 
-// temporary: draw a simple "in menu" placeholder on a player's display
-static void draw_menu_placeholder(player_id_t player) {
-    I2C_HandleTypeDef* i2c;
-    if (player == PLAYER_1) {
-        i2c = hardware_get_i2c1();
+    // determine whether we're editing a paused game or configuring a new one
+    // note: RUNNING transitions to PAUSED before menu opens (handled by game module)
+    // FINISHED transitions to ARMED before menu opens (handled by game module)
+    // so by this point phase is either ARMED or PAUSED
+    uint8_t is_paused = (phase == GAME_PHASE_PAUSED) ? TRUE : FALSE;
+
+    if (is_paused) {
+        // determine which bonus pointer to pass based on mode type
+        uint32_t* bonus_ptr;
+        time_control_mode_t mode = ps->config.time_control_mode;
+
+        if (mode == TIME_CONTROL_DELAY ||
+            mode == TIME_CONTROL_LIMITED ||
+            mode == TIME_CONTROL_BYOYOMI) {
+            // countdown modes: edit the live bonus timer
+            bonus_ptr = &ps->current_bonus_ms;
+        } else if (mode == TIME_CONTROL_INCREMENT ||
+                   mode == TIME_CONTROL_PARTIAL) {
+            // increment modes: edit the configured increment amount
+            bonus_ptr = &ps->config.bonus_time_ms[mode];
+        } else {
+            // none: no bonus to edit
+            bonus_ptr = NULL;
+        }
+
+        menu_open((uint8_t)player,
+                  &ps->config,
+                  &ps->current_time_ms,
+                  bonus_ptr,
+                  TRUE);
     } else {
-        i2c = hardware_get_i2c2();
+        // configuring new game: no live values to edit
+        menu_open((uint8_t)player,
+                  &ps->config,
+                  NULL,
+                  NULL,
+                  FALSE);
     }
-
-    display_clear(i2c);
-    display_draw_string(i2c, 30, 3, "IN MENU");
-    display_draw_string(i2c, 12, 5, "BACK = Ready!");
 }
 
-// tracks whether we already drew the placeholder to avoid redrawing every loop
-static uint8_t menu_placeholder_drawn[PLAYER_COUNT] = {FALSE, FALSE};
+// <---- internal helper: handle menu results for a player ---->
 
-// temporary: check back buttons to simulate menu "Ready!" selection
-// also draws placeholder when player first enters menu
-static void simulate_menu(void) {
+// checks menu actions and relays them to game module
+static void process_menu_result(player_id_t player) {
+    if (!menu_is_open((uint8_t)player)) {
+        return;
+    }
+
+    menu_action_t action = menu_update((uint8_t)player);
+
+    switch (action) {
+        case MENU_ACTION_READY:
+            // player selected "Ready!" — tell game module
+            game_player_ready(player);
+            break;
+
+        case MENU_ACTION_RESET:
+            // player confirmed reset — tell game module
+            game_request_reset();
+            break;
+
+        case MENU_ACTION_NONE:
+            // menu still active, nothing to relay
+            break;
+
+        default:
+            break;
+    }
+}
+
+// <---- internal helper: detect menu entry and call menu_open ---->
+
+// game module sets in_menu flag but doesn't open the menu module
+// main.c detects the flag transition and calls menu_open
+static uint8_t prev_in_menu[PLAYER_COUNT] = {FALSE, FALSE};
+
+static void check_menu_open(void) {
     for (uint8_t i = 0; i < PLAYER_COUNT; i++) {
         player_state_t* ps = game_get_player_state((player_id_t)i);
 
-        if (ps->in_menu) {
-            // draw placeholder once when entering menu
-            if (!menu_placeholder_drawn[i]) {
-                draw_menu_placeholder((player_id_t)i);
-                menu_placeholder_drawn[i] = TRUE;
-            }
-
-            // back button simulates selecting "Ready!"
-            if (button_was_pressed(back_buttons[i])) {
-                game_player_ready((player_id_t)i);
-                menu_placeholder_drawn[i] = FALSE;
-            }
-        } else {
-            menu_placeholder_drawn[i] = FALSE;
+        // detect transition: was not in menu, now is in menu
+        if (ps->in_menu && !prev_in_menu[i]) {
+            open_menu_for_player((player_id_t)i);
         }
+
+        prev_in_menu[i] = ps->in_menu;
     }
 }
 
@@ -107,16 +144,22 @@ int main(void) {
     display_clear(i2c1);
     display_clear(i2c2);
 
-    // initialize game module (starts in armed with defaults)
+    // initialize game and menu modules
     game_init();
+    menu_init();
 
     // main loop
     while (1) {
         // poll button states
         button_update();
 
-        // temporary: handle menu simulation with back buttons
-        simulate_menu();
+        // detect menu open transitions and wire to menu module
+        check_menu_open();
+
+        // update menu for players who are in menu
+        // relay any actions back to game module
+        process_menu_result(PLAYER_1);
+        process_menu_result(PLAYER_2);
 
         // run game state machine (input handling, transitions, display)
         game_update();
