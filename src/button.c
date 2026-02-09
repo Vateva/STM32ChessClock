@@ -144,3 +144,12 @@ uint8_t button_is_held(button_id_t button, uint32_t hold_time_ms) {
     
     return FALSE;
 }
+
+void button_clear_flags(button_id_t button) {
+    if (button >= BUTTON_COUNT) {
+        return;
+    }
+    // clear edge detection flags to prevent stale input
+    buttons[button].pressed_flag = FALSE;
+    buttons[button].released_flag = FALSE;
+}

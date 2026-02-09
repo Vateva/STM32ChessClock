@@ -88,7 +88,14 @@ static I2C_HandleTypeDef* get_player_i2c(player_id_t player) {
 static void set_default_config(player_config_t* config) {
     config->starting_time_ms = DEFAULT_STARTING_TIME_MS;
     config->time_control_mode = DEFAULT_TIME_CONTROL_MODE;
-    config->bonus_time_ms = DEFAULT_BONUS_TIME_MS;
+
+    // initialize each mode's bonus time with its own default
+    config->bonus_time_ms[TIME_CONTROL_NONE]      = DEFAULT_BONUS_NONE_MS;
+    config->bonus_time_ms[TIME_CONTROL_INCREMENT]  = DEFAULT_BONUS_INCREMENT_MS;
+    config->bonus_time_ms[TIME_CONTROL_DELAY]      = DEFAULT_BONUS_DELAY_MS;
+    config->bonus_time_ms[TIME_CONTROL_PARTIAL]    = DEFAULT_BONUS_PARTIAL_MS;
+    config->bonus_time_ms[TIME_CONTROL_LIMITED]    = DEFAULT_BONUS_LIMITED_MS;
+    config->bonus_time_ms[TIME_CONTROL_BYOYOMI]    = DEFAULT_BONUS_BYOYOMI_MS;
 }
 
 // <---- internal helper: load starting config into current times ---->
@@ -96,7 +103,7 @@ static void set_default_config(player_config_t* config) {
 // copies configured starting values into the live clock fields
 static void load_starting_times(player_state_t* player) {
     player->current_time_ms = player->config.starting_time_ms;
-    player->current_bonus_ms = player->config.bonus_time_ms;
+    player->current_bonus_ms = player->config.bonus_time_ms[player->config.time_control_mode];
 }
 
 // <---- internal helper: invalidate display cache to force full redraw ---->
@@ -173,6 +180,9 @@ static void transition_to_finished(player_id_t loser) {
 // called when the active player taps to pass the turn
 // applies bonus/increment rules to the player who just moved
 static void apply_time_control_on_tap(player_state_t* player) {
+    // shorthand for the bonus time configured for this player's current mode
+    uint32_t configured_bonus = player->config.bonus_time_ms[player->config.time_control_mode];
+
     switch (player->config.time_control_mode) {
         case TIME_CONTROL_NONE:
             // no bonus time to apply
@@ -180,17 +190,17 @@ static void apply_time_control_on_tap(player_state_t* player) {
 
         case TIME_CONTROL_INCREMENT:
             // fischer: add bonus time, can accumulate beyond starting time
-            player->current_time_ms += player->config.bonus_time_ms;
+            player->current_time_ms += configured_bonus;
             break;
 
         case TIME_CONTROL_DELAY:
             // bronstein: refresh the delay buffer to full
-            player->current_bonus_ms = player->config.bonus_time_ms;
+            player->current_bonus_ms = configured_bonus;
             break;
 
         case TIME_CONTROL_PARTIAL:
             // add bonus time but cap at starting time
-            player->current_time_ms += player->config.bonus_time_ms;
+            player->current_time_ms += configured_bonus;
             if (player->current_time_ms > player->config.starting_time_ms) {
                 player->current_time_ms = player->config.starting_time_ms;
             }
@@ -198,13 +208,13 @@ static void apply_time_control_on_tap(player_state_t* player) {
 
         case TIME_CONTROL_LIMITED:
             // refresh the limited time buffer to full
-            player->current_bonus_ms = player->config.bonus_time_ms;
+            player->current_bonus_ms = configured_bonus;
             break;
 
         case TIME_CONTROL_BYOYOMI:
             // refresh byo-yomi period if main time already expired
             if (player->current_time_ms == 0) {
-                player->current_bonus_ms = player->config.bonus_time_ms;
+                player->current_bonus_ms = configured_bonus;
             }
             break;
 
@@ -440,9 +450,18 @@ static void update_player_display(player_id_t player) {
 
     // determine what to display based on phase
     uint32_t display_time_ms = ps->current_time_ms;
-    uint32_t display_bonus_ms = ps->current_bonus_ms;
     uint8_t display_ready = FALSE;
     uint8_t is_blink_visible = TRUE;    // default: visible (no blink)
+
+    // increment/partial: header shows configured value (not a live countdown)
+    // countdown modes (delay/limited/byoyomi): header shows live bonus remaining
+    uint32_t display_bonus_ms;
+    if (ps->config.time_control_mode == TIME_CONTROL_INCREMENT ||
+        ps->config.time_control_mode == TIME_CONTROL_PARTIAL) {
+        display_bonus_ms = ps->config.bonus_time_ms[ps->config.time_control_mode];
+    } else {
+        display_bonus_ms = ps->current_bonus_ms;
+    }
 
     // in byo-yomi, show bonus time on big clock when main time is 0
     if (game.phase == GAME_PHASE_RUNNING &&
@@ -722,6 +741,10 @@ void game_player_ready(player_id_t player) {
     }
 
     game.players[player].in_menu = FALSE;
+
+    // flush stale tap button press to prevent accidental game start on menu exit
+    button_clear_flags(tap_buttons[player]);
+
     invalidate_display_cache(player);
 }
 

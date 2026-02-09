@@ -82,9 +82,16 @@
 
 // <---- chess clock defaults and limits ---->
 
-// default time configuration (in milliseconds)
-#define DEFAULT_STARTING_TIME_MS         300000       // 5 minutes
-#define DEFAULT_BONUS_TIME_MS            0            // default increment/delay amount
+// default starting time (in milliseconds)
+#define DEFAULT_STARTING_TIME_MS              300000    // 5 minutes
+
+// default bonus time per mode (in milliseconds)
+#define DEFAULT_BONUS_NONE_MS                 0         // not used
+#define DEFAULT_BONUS_INCREMENT_MS            3000      // 3 seconds
+#define DEFAULT_BONUS_DELAY_MS                2000      // 2 seconds
+#define DEFAULT_BONUS_PARTIAL_MS              5000      // 5 seconds
+#define DEFAULT_BONUS_LIMITED_MS              30000     // 30 seconds
+#define DEFAULT_BONUS_BYOYOMI_MS              30000     // 30 seconds
 
 // time limits (in milliseconds)
 #define MIN_STARTING_TIME_MS             1000         // 1 second minimum
@@ -130,7 +137,7 @@ typedef enum {
 typedef struct {
     uint32_t starting_time_ms;              // configured starting time in milliseconds
     time_control_mode_t time_control_mode;  // selected time control mode
-    uint32_t bonus_time_ms;                 // configured bonus time for the selected mode
+    uint32_t bonus_time_ms[TIME_CONTROL_MODE_COUNT];  // bonus time per mode in milliseconds
 } player_config_t;
 
 // <---- menu configuration ---->

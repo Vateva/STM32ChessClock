@@ -49,6 +49,9 @@ static const int8_t quadrature_table[4][4] = {
     {   0,  +1,  -1,   0 }   // 11
 };
 
+//click accumulator (4 transitions = 1 physical click)
+static int8_t click_fractional[ENCODER_COUNT] = {0, 0};
+
 // <---- initialization ---->
 
 void encoder_init(void) {
@@ -59,6 +62,7 @@ void encoder_init(void) {
         encoders[i].pin_b = encoder_configs[i].pin_b;
         encoders[i].direction_multiplier = encoder_configs[i].direction_multiplier;
         encoders[i].delta = 0;
+        click_fractional[i] = 0;
         
         // read initial state of encoder pins
         uint8_t a = (HAL_GPIO_ReadPin(encoders[i].port, encoders[i].pin_a) == GPIO_PIN_SET) ? 1 : 0;
@@ -126,7 +130,7 @@ void EXTI15_10_IRQHandler(void) {
 
 // <---- encoder reading ---->
 
-int8_t encoder_get_delta(encoder_id_t encoder) {
+static int8_t encoder_get_delta(encoder_id_t encoder) {
     if (encoder >= ENCODER_COUNT) {
         return 0;
     }
@@ -139,4 +143,26 @@ int8_t encoder_get_delta(encoder_id_t encoder) {
     __enable_irq();
 
     return delta;
+}
+
+
+int8_t encoder_get_clicks(encoder_id_t encoder) {
+    if (encoder >= ENCODER_COUNT) {
+        return 0;
+    }
+
+    // accumulate raw transitions
+    click_fractional[encoder] += encoder_get_delta(encoder);
+
+    // convert to whole clicks
+    int8_t clicks = 0;
+    while (click_fractional[encoder] >= ENCODER_PULSES_PER_CLICK) {
+        clicks++;
+        click_fractional[encoder] -= ENCODER_PULSES_PER_CLICK;
+    }
+    while (click_fractional[encoder] <= -ENCODER_PULSES_PER_CLICK) {
+        clicks--;
+        click_fractional[encoder] += ENCODER_PULSES_PER_CLICK;
+    }
+    return clicks;
 }

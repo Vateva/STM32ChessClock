@@ -71,4 +71,12 @@ uint8_t button_was_released(button_id_t button);
  */
 uint8_t button_is_held(button_id_t button, uint32_t hold_time_ms);
 
+/**
+ * clear pressed and released flags for a button
+ * prevents stale input from being consumed after a state change
+ *
+ * @param button button to clear
+ */
+void button_clear_flags(button_id_t button);
+
 #endif  // BUTTON_H

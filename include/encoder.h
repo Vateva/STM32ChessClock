@@ -30,12 +30,12 @@ void encoder_init(void);
 // <---- encoder reading ---->
 
 /**
- * get encoder movement since last call
- * returns relative change in position
- * 
+ * get encoder movement in physical clicks since last call
+ * converts raw quadrature transitions (4 per click) to clicks
+ *
  * @param encoder encoder to read
- * @return +1 for clockwise, -1 for counter-clockwise, 0 for no change
+ * @return +1 for clockwise click, -1 for counter-clockwise click, 0 for no change
  */
-int8_t encoder_get_delta(encoder_id_t encoder);
+int8_t encoder_get_clicks(encoder_id_t encoder);
 
 #endif // ENCODER_H
