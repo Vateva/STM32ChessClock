@@ -15,6 +15,12 @@
 
 // <---- internal helper: open menu for a player ---->
 
+// game module sets in_menu flag but doesn't open the menu module
+// main.c detects the flag transition and calls menu_open
+static uint8_t prev_in_menu[PLAYER_COUNT] = {FALSE, FALSE};
+// tracks mode at menu open to detect mode changes on menu exit
+static time_control_mode_t mode_at_menu_open[PLAYER_COUNT];
+
 // reads game state and passes the right pointers to the menu module
 static void open_menu_for_player(player_id_t player) {
     player_state_t* ps = game_get_player_state(player);
@@ -45,6 +51,9 @@ static void open_menu_for_player(player_id_t player) {
             bonus_ptr = NULL;
         }
 
+        // remember mode at menu open to detect changes on exit
+        mode_at_menu_open[player] = ps->config.time_control_mode;
+
         menu_open((uint8_t)player,
                   &ps->config,
                   &ps->current_time_ms,
@@ -72,18 +81,19 @@ static void process_menu_result(player_id_t player) {
 
     switch (action) {
         case MENU_ACTION_READY: {
-            // sync live bonus to match whatever mode was selected in menu
             player_state_t* ps = game_get_player_state(player);
             time_control_mode_t active_mode = ps->config.time_control_mode;
 
-            if (active_mode == TIME_CONTROL_DELAY ||
-                active_mode == TIME_CONTROL_LIMITED ||
-                active_mode == TIME_CONTROL_BYOYOMI) {
-                // countdown modes use a live bonus timer
-                ps->current_bonus_ms = ps->config.bonus_time_ms[active_mode];
+            // only sync live bonus if player changed the mode during this menu session
+            // if mode is unchanged, the time editor's edit to current_bonus_ms is preserved
+            if (active_mode != mode_at_menu_open[player]) {
+                if (active_mode == TIME_CONTROL_DELAY ||
+                    active_mode == TIME_CONTROL_LIMITED ||
+                    active_mode == TIME_CONTROL_BYOYOMI) {
+                    ps->current_bonus_ms = ps->config.bonus_time_ms[active_mode];
+                }
             }
 
-            // tell game module player is ready
             game_player_ready(player);
             break;
         }
@@ -103,10 +113,6 @@ static void process_menu_result(player_id_t player) {
 }
 
 // <---- internal helper: detect menu entry and call menu_open ---->
-
-// game module sets in_menu flag but doesn't open the menu module
-// main.c detects the flag transition and calls menu_open
-static uint8_t prev_in_menu[PLAYER_COUNT] = {FALSE, FALSE};
 
 static void check_menu_open(void) {
     for (uint8_t i = 0; i < PLAYER_COUNT; i++) {

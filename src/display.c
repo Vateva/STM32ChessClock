@@ -235,7 +235,8 @@ void display_draw_header(I2C_HandleTypeDef* i2c_handle, time_control_mode_t mode
       show_dynamic_countdown = TRUE;
       break;
     case TIME_CONTROL_BYOYOMI:
-      snprintf(header_left, sizeof(header_left), "Byo-yomi - %lus", bonus_seconds);
+      snprintf(header_left, sizeof(header_left), "Byo-yomi");
+      show_dynamic_countdown = TRUE;
       break;
     default:
       snprintf(header_left, sizeof(header_left), "Unknown");
@@ -280,6 +281,50 @@ void display_draw_header(I2C_HandleTypeDef* i2c_handle, time_control_mode_t mode
     // draw 's' suffix
     display_draw_medium_character(i2c_handle, current_x, 0, 's');
   }
+}
+
+// <---- header bonus partial update ---->
+
+// redraws only the right-side medium font bonus digits
+// used by countdown modes (delay, limited, byo-yomi) to avoid full header flicker
+void display_update_header_bonus(I2C_HandleTypeDef* i2c_handle, uint32_t bonus_time_milliseconds) {
+    uint32_t bonus_seconds = bonus_time_milliseconds / 1000;
+
+    // clear right portion of pages 0 and 1 (medium font spans 2 pages)
+    // 32 pixels wide covers up to 3 digits + 's' at 8px each
+    uint8_t clear_data[33];
+    clear_data[0] = 0x40;
+    memset(&clear_data[1], 0x00, 32);
+
+    display_set_position(i2c_handle, 96, 0);
+    HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, clear_data, 33, 100);
+    display_set_position(i2c_handle, 96, 1);
+    HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, clear_data, 33, 100);
+
+    // calculate digit count for right-aligned positioning
+    uint8_t num_digits;
+    if (bonus_seconds >= 100) num_digits = 3;
+    else if (bonus_seconds >= 10) num_digits = 2;
+    else num_digits = 1;
+
+    // each medium character is 8px wide, total = (digits + 's') * 8
+    uint8_t total_width = (num_digits + 1) * 8;
+    uint8_t current_x = 128 - total_width;
+
+    // draw each digit from left to right
+    if (num_digits == 3) {
+        display_draw_medium_character(i2c_handle, current_x, 0, '0' + (bonus_seconds / 100));
+        current_x += 8;
+    }
+    if (num_digits >= 2) {
+        display_draw_medium_character(i2c_handle, current_x, 0, '0' + ((bonus_seconds / 10) % 10));
+        current_x += 8;
+    }
+    display_draw_medium_character(i2c_handle, current_x, 0, '0' + (bonus_seconds % 10));
+    current_x += 8;
+
+    // draw 's' suffix
+    display_draw_medium_character(i2c_handle, current_x, 0, 's');
 }
 
 void display_draw_clock(I2C_HandleTypeDef* i2c_handle, uint32_t time_milliseconds) {

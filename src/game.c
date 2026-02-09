@@ -481,15 +481,13 @@ static void update_player_display(player_id_t player) {
         is_blink_visible = (blink_phase == 0) ? TRUE : FALSE;
     }
 
-    // update header if mode or bonus time changed
-    if (cache->mode != ps->config.time_control_mode ||
-        cache->bonus_ms != display_bonus_ms) {
-
-        // clear header area (page 0 and page 1 for medium font)
-        display_set_position(i2c, 0, 0);
+    // update header if mode changed (full redraw) or bonus changed (partial redraw)
+    if (cache->mode != ps->config.time_control_mode) {
+        // mode changed: clear entire header area and redraw everything
         uint8_t clear_data[129];
         clear_data[0] = 0x40;
         memset(&clear_data[1], 0x00, 128);
+        display_set_position(i2c, 0, 0);
         HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
         display_set_position(i2c, 0, 1);
         HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, clear_data, 129, 1000);
@@ -497,6 +495,11 @@ static void update_player_display(player_id_t player) {
         display_draw_header(i2c, ps->config.time_control_mode, display_bonus_ms);
 
         cache->mode = ps->config.time_control_mode;
+        cache->bonus_ms = display_bonus_ms;
+    } else if (cache->bonus_ms != display_bonus_ms) {
+        // only bonus value changed: redraw just the digits on the right
+        display_update_header_bonus(i2c, display_bonus_ms);
+
         cache->bonus_ms = display_bonus_ms;
     }
 

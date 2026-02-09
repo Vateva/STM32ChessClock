@@ -121,6 +121,16 @@ void display_draw_header(I2C_HandleTypeDef* i2c_handle, time_control_mode_t mode
 void display_draw_clock(I2C_HandleTypeDef* i2c_handle, uint32_t time_milliseconds);
 
 /**
+ * update only the bonus time digits in the header
+ * partial redraw for countdown modes (delay, limited, byo-yomi)
+ * avoids clearing and redrawing the mode name
+ *
+ * @param i2c_handle pointer to i2c handle for this display
+ * @param bonus_time_milliseconds current bonus time in milliseconds
+ */
+void display_update_header_bonus(I2C_HandleTypeDef* i2c_handle, uint32_t bonus_time_milliseconds);
+
+/**
  * draw ready footer
  * draws "Ready!" under a players clock when ready
  *
