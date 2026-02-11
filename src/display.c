@@ -9,6 +9,7 @@
 
 #include "config.h"
 #include "fonts.h"
+#include "splash.h"
 
 // <---- sh1106 command definitions ---->
 
@@ -64,6 +65,10 @@ void display_init(I2C_HandleTypeDef* i2c_handle) {
   display_send_command(i2c_handle, 0x40);
   display_send_command(i2c_handle, 0xA4);  // display from ram
   display_send_command(i2c_handle, 0xA6);  // normal display (not inverted)
+
+  // clear gddram before turning display on to prevent garbage on boot
+  display_clear(i2c_handle);
+
   display_send_command(i2c_handle, SH1106_CMD_DISPLAY_ON);
 
   HAL_Delay(100);
@@ -95,6 +100,22 @@ void display_clear(I2C_HandleTypeDef* i2c_handle) {
   // clear all 8 pages
   for (uint8_t page = 0; page < DISPLAY_PAGES; page++) {
     display_set_position(i2c_handle, 0, page);
+    HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, data, 129, 1000);
+  }
+}
+
+// <---- bitmap drawing ---->
+
+void display_draw_bitmap(I2C_HandleTypeDef* i2c_handle, const uint8_t* bitmap) {
+  uint8_t data[129];
+  data[0] = 0x40;  // data mode
+
+  for (uint8_t page = 0; page < DISPLAY_PAGES; page++) {
+    display_set_position(i2c_handle, 0, page);
+
+    // copy 128 columns for this page from bitmap
+    memcpy(&data[1], &bitmap[page * DISPLAY_WIDTH], DISPLAY_WIDTH);
+
     HAL_I2C_Master_Transmit(i2c_handle, DISPLAY_I2C_ADDRESS, data, 129, 1000);
   }
 }
@@ -392,4 +413,21 @@ void display_draw_clock_screen(I2C_HandleTypeDef* i2c_handle,
   display_draw_clock(i2c_handle, time_milliseconds);
 
   display_draw_footer(i2c_handle, is_ready);
+}
+
+// <---- splash screen ---->
+
+void display_show_splash(I2C_HandleTypeDef* i2c1, I2C_HandleTypeDef* i2c2) {
+  for (uint8_t i = 0; i < SPLASH_FRAME_COUNT; i++) {
+    display_draw_bitmap(i2c1, splash_frames[i]);
+    display_draw_bitmap(i2c2, splash_frames[i]);
+
+    // delay between frames (skip delay after last frame, hold instead)
+    if (i < SPLASH_FRAME_COUNT - 1) {
+      HAL_Delay(SPLASH_FRAME_DELAY_MS);
+    }
+  }
+
+  // hold last frame before transitioning to clock screen
+  HAL_Delay(SPLASH_HOLD_LAST_FRAME_MS);
 }

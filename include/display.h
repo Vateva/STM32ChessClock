@@ -40,6 +40,19 @@ void display_clear(I2C_HandleTypeDef* i2c_handle);
  */
 void display_set_position(I2C_HandleTypeDef* i2c_handle, uint8_t x_position, uint8_t page);
 
+// <---- bitmap drawing ---->
+
+/**
+ * draw a full-screen 128x64 monochrome bitmap
+ * data format: 8 pages of 128 bytes each (1024 bytes total)
+ * each byte is 8 vertical pixels, lsb = top pixel
+ * matches image2cpp "vertical" draw mode output
+ *
+ * @param i2c_handle pointer to i2c handle for this display
+ * @param bitmap pointer to 1024-byte bitmap array
+ */
+void display_draw_bitmap(I2C_HandleTypeDef* i2c_handle, const uint8_t* bitmap);
+
 // <---- text drawing ---->
 
 /**
@@ -155,6 +168,17 @@ void display_draw_clock_screen(I2C_HandleTypeDef* i2c_handle,
                                time_control_mode_t mode,
                                uint32_t bonus_time_millisecond,
                                uint8_t is_ready);
+
+// <---- splash screen ---->
+
+/**
+ * play splash screen animation on both displays
+ * shows each frame from splash.h with configured delays
+ *
+ * @param i2c1 pointer to i2c handle for player 1 display
+ * @param i2c2 pointer to i2c handle for player 2 display
+ */
+void display_show_splash(I2C_HandleTypeDef* i2c1, I2C_HandleTypeDef* i2c2);
 
 // <---- low-level communication ---->
 

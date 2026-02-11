@@ -159,6 +159,11 @@ int main(void) {
     HAL_Delay(100);
     display_init(i2c1);
     display_init(i2c2);
+
+    // show boot splash animation
+    display_show_splash(i2c1, i2c2);
+
+    // clear displays before drawing clock screen
     display_clear(i2c1);
     display_clear(i2c2);
 
