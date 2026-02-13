@@ -745,6 +745,11 @@ void game_player_ready(player_id_t player) {
 
     game.players[player].in_menu = FALSE;
 
+    // if in armed phase, reload starting times in case they were edited in menu
+    if (game.phase == GAME_PHASE_ARMED) {
+        load_starting_times(&game.players[player]);
+    }
+
     // flush stale tap button press to prevent accidental game start on menu exit
     button_clear_flags(tap_buttons[player]);
 
