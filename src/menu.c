@@ -773,6 +773,9 @@ static menu_action_t handle_main_menu(menu_state_t* state, uint8_t player_index)
         }
     }
 
+    // flush back button presses at main menu level (not used here, prevent stale input)
+    button_clear_flags(player_back[player_index]);
+
     return MENU_ACTION_NONE;
 }
 
