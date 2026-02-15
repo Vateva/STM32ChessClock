@@ -111,14 +111,6 @@ static I2C_HandleTypeDef* get_player_i2c(uint8_t player_index) {
     return hardware_get_i2c2();
 }
 
-// <---- internal helper: clamp value within range ---->
-
-static uint8_t clamp_uint8(int16_t value, uint8_t min_val, uint8_t max_val) {
-    if (value < (int16_t)min_val) return min_val;
-    if (value > (int16_t)max_val) return max_val;
-    return (uint8_t)value;
-}
-
 // <---- internal helper: clear a rectangular area on display ---->
 
 // clears a region defined by x start, pixel width, and page range
@@ -787,16 +779,32 @@ static void handle_time_editor(menu_state_t* state, uint8_t player_index) {
     if (delta != 0) {
         switch (state->time_editor_field) {
             case TIME_FIELD_HOURS:
-                state->edit_hours = clamp_uint8((int16_t)state->edit_hours + delta, 0, TIME_EDITOR_HOURS_MAX);
+                if (delta > 0) {
+                    state->edit_hours = (state->edit_hours == TIME_EDITOR_HOURS_MAX) ? 0 : state->edit_hours + 1;
+                } else if (delta < 0) {
+                    state->edit_hours = (state->edit_hours == 0) ? TIME_EDITOR_HOURS_MAX : state->edit_hours - 1;
+                }
                 break;
             case TIME_FIELD_MINUTES:
-                state->edit_minutes = clamp_uint8((int16_t)state->edit_minutes + delta, 0, TIME_EDITOR_MINUTES_MAX);
+                if (delta > 0) {
+                    state->edit_minutes = (state->edit_minutes == TIME_EDITOR_MINUTES_MAX) ? 0 : state->edit_minutes + 1;
+                } else if (delta < 0) {
+                    state->edit_minutes = (state->edit_minutes == 0) ? TIME_EDITOR_MINUTES_MAX : state->edit_minutes - 1;
+                }
                 break;
             case TIME_FIELD_SECONDS:
-                state->edit_seconds = clamp_uint8((int16_t)state->edit_seconds + delta, 0, TIME_EDITOR_SECONDS_MAX);
+                if (delta > 0) {
+                    state->edit_seconds = (state->edit_seconds == TIME_EDITOR_SECONDS_MAX) ? 0 : state->edit_seconds + 1;
+                } else if (delta < 0) {
+                    state->edit_seconds = (state->edit_seconds == 0) ? TIME_EDITOR_SECONDS_MAX : state->edit_seconds - 1;
+                }
                 break;
             case TIME_FIELD_BONUS:
-                state->edit_bonus_seconds = clamp_uint8((int16_t)state->edit_bonus_seconds + delta, 0, BONUS_TIME_EDITOR_SECONDS_MAX);
+                if (delta > 0) {
+                    state->edit_bonus_seconds = (state->edit_bonus_seconds == BONUS_TIME_EDITOR_SECONDS_MAX) ? 0 : state->edit_bonus_seconds + 1;
+                } else if (delta < 0) {
+                    state->edit_bonus_seconds = (state->edit_bonus_seconds == 0) ? BONUS_TIME_EDITOR_SECONDS_MAX : state->edit_bonus_seconds - 1;
+                }
                 break;
             default:
                 break;
@@ -855,10 +863,20 @@ static void handle_mode_list(menu_state_t* state, uint8_t player_index) {
         // encoder adjusts bonus value of highlighted mode
         if (delta != 0) {
             uint32_t current_seconds = state->config->bonus_time_ms[state->mode_list_cursor] / 1000;
-            int32_t new_seconds = (int32_t)current_seconds + delta;
-            if (new_seconds < 1) new_seconds = 1;
-            if (new_seconds > BONUS_TIME_EDITOR_SECONDS_MAX) new_seconds = BONUS_TIME_EDITOR_SECONDS_MAX;
-            state->config->bonus_time_ms[state->mode_list_cursor] = (uint32_t)new_seconds * 1000;
+            if (delta > 0) {
+                if (current_seconds == BONUS_TIME_EDITOR_SECONDS_MAX) {
+                    current_seconds = 0;
+                } else {
+                    current_seconds++;
+                }
+            } else if (delta < 0) {
+                if (current_seconds == 0) {
+                    current_seconds = BONUS_TIME_EDITOR_SECONDS_MAX;
+                } else {
+                    current_seconds--;
+                }
+            }
+            state->config->bonus_time_ms[state->mode_list_cursor] = (uint32_t)current_seconds * 1000;
         }
 
         // encoder push confirms: move checkmark, stop editing
