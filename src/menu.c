@@ -45,7 +45,10 @@ typedef struct {
     
     // reset confirm cache
     uint8_t reset_confirm_cursor;
-       
+
+    // buzzer cache
+    uint8_t buzzer_enabled;
+
     // blink state
     uint8_t last_blink_visible;
     
@@ -90,6 +93,7 @@ static const char* mode_names[TIME_CONTROL_MODE_COUNT] = {
 static const char* armed_menu_items[MENU_ARMED_ITEM_COUNT] = {
     "Starting Time",
     "Time Control",
+    "Buzzer",
     "Ready!"
 };
 
@@ -98,6 +102,7 @@ static const char* armed_menu_items[MENU_ARMED_ITEM_COUNT] = {
 static const char* paused_menu_items[MENU_PAUSED_ITEM_COUNT] = {
     "Current Time",
     "Current Time Control",
+    "Buzzer",
     "Reset",
     "Ready!"
 };
@@ -165,7 +170,7 @@ static void draw_main_menu(menu_state_t* state, I2C_HandleTypeDef* i2c, menu_dis
         // draw all menu items
         for (uint8_t i = 0; i < count; i++) {
             uint8_t page = i + 1;
-            
+
             if (i == state->main_menu_cursor) {
                 display_draw_string(i2c, 0, page, ">");
                 display_draw_string(i2c, 8, page, items[i]);
@@ -173,8 +178,13 @@ static void draw_main_menu(menu_state_t* state, I2C_HandleTypeDef* i2c, menu_dis
                 display_draw_string(i2c, 8, page, items[i]);
             }
         }
-        
+
+        // draw buzzer value on buzzer row (index 2 in both menus, page 3)
+        const char* val = *state->buzzer_enabled ? "[On]" : "[Off]";
+        display_draw_string(i2c, 98, 3, val);
+
         cache->main_menu_cursor = state->main_menu_cursor;
+        cache->buzzer_enabled = *state->buzzer_enabled;
         cache->needs_full_redraw = FALSE;
         return;
     }
@@ -183,14 +193,23 @@ static void draw_main_menu(menu_state_t* state, I2C_HandleTypeDef* i2c, menu_dis
     if (cache->main_menu_cursor != state->main_menu_cursor) {
         uint8_t old_page = cache->main_menu_cursor + 1;
         uint8_t new_page = state->main_menu_cursor + 1;
-        
+
         // clear old cursor position
         clear_display_area(i2c, 0, 6, old_page, old_page);
-        
+
         // draw new cursor position
         display_draw_string(i2c, 0, new_page, ">");
-        
+
         cache->main_menu_cursor = state->main_menu_cursor;
+    }
+
+    // update buzzer value if it changed
+    uint8_t current_buzzer = *state->buzzer_enabled;
+    if (cache->buzzer_enabled != current_buzzer) {
+        clear_display_area(i2c, 98, 30, 3, 3);
+        const char* val = current_buzzer ? "[On]" : "[Off]";
+        display_draw_string(i2c, 98, 3, val);
+        cache->buzzer_enabled = current_buzzer;
     }
 }
 
@@ -722,6 +741,11 @@ static menu_action_t handle_main_menu(menu_state_t* state, uint8_t player_index)
                     menu_cache[player_index].needs_full_redraw = TRUE;
                     break;
 
+                case PAUSED_ITEM_BUZZER:
+                    // toggle buzzer on/off
+                    *state->buzzer_enabled = !(*state->buzzer_enabled);
+                    break;
+
                 case PAUSED_ITEM_RESET:
                     // enter reset confirmation
                     state->reset_confirm_cursor = 1;  // default to "No"
@@ -753,6 +777,11 @@ static menu_action_t handle_main_menu(menu_state_t* state, uint8_t player_index)
                     state->mode_editing = FALSE;
                     state->current_screen = MENU_SCREEN_MODE_LIST;
                     menu_cache[player_index].needs_full_redraw = TRUE;
+                    break;
+
+                case ARMED_ITEM_BUZZER:
+                    // toggle buzzer on/off
+                    *state->buzzer_enabled = !(*state->buzzer_enabled);
                     break;
 
                 case ARMED_ITEM_READY:
@@ -975,7 +1004,8 @@ void menu_open(uint8_t player_index,
                player_config_t* config,
                uint32_t* current_time,
                uint32_t* current_bonus,
-               uint8_t is_paused) {
+               uint8_t is_paused,
+               uint8_t* buzzer_enabled) {
 
     if (player_index > 1) return;
 
@@ -986,6 +1016,7 @@ void menu_open(uint8_t player_index,
     state->config = config;
     state->current_time_to_edit = current_time;
     state->current_bonus_to_edit = current_bonus;
+    state->buzzer_enabled = buzzer_enabled;
     state->is_paused = is_paused;
 
     // set up menu variant

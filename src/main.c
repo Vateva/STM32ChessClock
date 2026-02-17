@@ -58,14 +58,16 @@ static void open_menu_for_player(player_id_t player) {
                   &ps->config,
                   &ps->current_time_ms,
                   bonus_ptr,
-                  TRUE);
+                  TRUE,
+                  &game_get_state()->buzzer_enabled);
     } else {
         // configuring new game: no live values to edit
         menu_open((uint8_t)player,
                   &ps->config,
                   NULL,
                   NULL,
-                  FALSE);
+                  FALSE,
+                  &game_get_state()->buzzer_enabled);
     }
 }
 

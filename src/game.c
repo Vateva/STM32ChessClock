@@ -165,10 +165,12 @@ static void transition_to_finished(player_id_t loser) {
     // stop hardware timer
     hardware_stop_clock_timer();
 
-    // start buzzer beep pattern
-    buzzer_state = BUZZER_BEEP_1;
-    buzzer_timestamp = HAL_GetTick();
-    hardware_buzzer_on();
+    // start buzzer beep pattern (only if buzzer is enabled)
+    if (game.buzzer_enabled) {
+        buzzer_state = BUZZER_BEEP_1;
+        buzzer_timestamp = HAL_GetTick();
+        hardware_buzzer_on();
+    }
 
     for (uint8_t i = 0; i < PLAYER_COUNT; i++) {
         invalidate_display_cache((player_id_t)i);
@@ -584,6 +586,9 @@ void game_init(void) {
 
     // initialize buzzer state
     buzzer_state = BUZZER_IDLE;
+
+    // buzzer enabled by default
+    game.buzzer_enabled = TRUE;
 }
 
 // <---- main update ---->

@@ -42,6 +42,7 @@ typedef struct {
     game_phase_t phase;                 // current global game phase
     player_id_t active_player;          // which player's clock is counting down
     player_state_t players[PLAYER_COUNT];  // state for both players
+    uint8_t buzzer_enabled;             // flag: buzzer sounds on game finish
 } game_t;
 
 // <---- initialization ---->

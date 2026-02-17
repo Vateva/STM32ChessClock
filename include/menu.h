@@ -34,20 +34,22 @@ typedef enum {
 // armed menu:  Starting Time, Time Control, Ready
 // paused menu: Current Time, Time Control, Reset, Ready
 
-#define MENU_ARMED_ITEM_COUNT       3
-#define MENU_PAUSED_ITEM_COUNT      4
+#define MENU_ARMED_ITEM_COUNT       4
+#define MENU_PAUSED_ITEM_COUNT      5
 
 typedef enum {
     // armed menu items
     ARMED_ITEM_STARTING_TIME = 0,
     ARMED_ITEM_TIME_CONTROL = 1,
-    ARMED_ITEM_READY = 2,
+    ARMED_ITEM_BUZZER = 2,
+    ARMED_ITEM_READY = 3,
 
     // paused menu items
     PAUSED_ITEM_CURRENT_TIME = 0,
     PAUSED_ITEM_TIME_CONTROL = 1,
-    PAUSED_ITEM_RESET = 2,
-    PAUSED_ITEM_READY = 3
+    PAUSED_ITEM_BUZZER = 2,
+    PAUSED_ITEM_RESET = 3,
+    PAUSED_ITEM_READY = 4
 } menu_item_t;
 
 // <---- time editor field indices ---->
@@ -83,6 +85,9 @@ typedef struct {
     uint8_t edit_seconds;              // 0-59
     uint8_t edit_bonus_seconds;         // 0-59
 
+    // buzzer toggle
+    uint8_t* buzzer_enabled;            // pointer to shared buzzer enabled flag
+
     // context
     uint8_t is_paused;                  // determines which menu variant to show
     uint8_t item_count;                 // number of items in main menu
@@ -116,7 +121,8 @@ void menu_open(uint8_t player_index,
                player_config_t* config,
                uint32_t* current_time,
                uint32_t* current_bonus,
-               uint8_t is_paused);
+               uint8_t is_paused,
+               uint8_t* buzzer_enabled);
 
 // <---- menu update ---->
 
