@@ -263,7 +263,7 @@ static void draw_time_editor(menu_state_t* state, I2C_HandleTypeDef* i2c, menu_d
         HAL_I2C_Master_Transmit(i2c, DISPLAY_I2C_ADDRESS, colon_data, 6, 100);
 
         // draw footer
-        display_draw_string(i2c, 10, 7, "Hold to save");
+        display_draw_string(i2c, 4, 7, "Press & hold to save");
 
         // draw all non-blinking digits
         if (state->time_editor_field != TIME_FIELD_HOURS) {
