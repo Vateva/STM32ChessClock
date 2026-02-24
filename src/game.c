@@ -54,8 +54,8 @@ static buzzer_pattern_state_t buzzer_state;
 static uint32_t buzzer_timestamp;       // when current buzzer step started
 
 // buzzer pattern timing in milliseconds
-#define BUZZER_BEEP_DURATION_MS     150
-#define BUZZER_PAUSE_DURATION_MS    100
+#define BUZZER_BEEP_DURATION_MS     500
+#define BUZZER_PAUSE_DURATION_MS    250
 
 // <---- finished state blink timing ---->
 
