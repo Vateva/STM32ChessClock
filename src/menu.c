@@ -983,6 +983,9 @@ static void handle_save_feedback(menu_state_t* state, uint8_t player_index) {
         // auto-return to main menu
         state->current_screen = MENU_SCREEN_MAIN;
         menu_cache[player_index].needs_full_redraw = TRUE;
+
+        // flush encoder push to prevent stale press from selecting a menu item
+        button_clear_flags(player_encoder_push[player_index]);
     }
 }
 

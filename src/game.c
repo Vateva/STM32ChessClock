@@ -273,8 +273,12 @@ static void handle_input_armed(void) {
         return;
     }
 
+    // consume both taps independently to avoid short-circuit leaving a stale flag
+    uint8_t p1_tap = button_was_pressed(BUTTON_PLAYER1_TAP);
+    uint8_t p2_tap = button_was_pressed(BUTTON_PLAYER2_TAP);
+
     // player 1 taps: player 2 becomes active
-    if (button_was_pressed(BUTTON_PLAYER1_TAP)) {
+    if (p1_tap) {
         // load starting times for a fresh game
         for (uint8_t i = 0; i < PLAYER_COUNT; i++) {
             load_starting_times(&game.players[i]);
@@ -282,7 +286,7 @@ static void handle_input_armed(void) {
         transition_to_running(PLAYER_2);
     }
     // player 2 taps: player 1 becomes active
-    else if (button_was_pressed(BUTTON_PLAYER2_TAP)) {
+    else if (p2_tap) {
         for (uint8_t i = 0; i < PLAYER_COUNT; i++) {
             load_starting_times(&game.players[i]);
         }
@@ -318,12 +322,16 @@ static void handle_input_paused(void) {
         return;
     }
 
+    // consume both taps independently to avoid short-circuit leaving a stale flag
+    uint8_t p1_tap = button_was_pressed(BUTTON_PLAYER1_TAP);
+    uint8_t p2_tap = button_was_pressed(BUTTON_PLAYER2_TAP);
+
     // player 1 taps: player 2 becomes active, resume with saved times
-    if (button_was_pressed(BUTTON_PLAYER1_TAP)) {
+    if (p1_tap) {
         transition_to_running(PLAYER_2);
     }
     // player 2 taps: player 1 becomes active, resume with saved times
-    else if (button_was_pressed(BUTTON_PLAYER2_TAP)) {
+    else if (p2_tap) {
         transition_to_running(PLAYER_1);
     }
 }
@@ -331,8 +339,12 @@ static void handle_input_paused(void) {
 // <---- internal helper: handle input for finished phase ---->
 
 static void handle_input_finished(void) {
+    // consume both taps independently to avoid short-circuit leaving a stale flag
+    uint8_t p1_tap = button_was_pressed(BUTTON_PLAYER1_TAP);
+    uint8_t p2_tap = button_was_pressed(BUTTON_PLAYER2_TAP);
+
     // any tap from either player goes to armed with last config
-    if (button_was_pressed(BUTTON_PLAYER1_TAP) || button_was_pressed(BUTTON_PLAYER2_TAP)) {
+    if (p1_tap || p2_tap) {
         transition_to_armed();
     }
 }
@@ -755,8 +767,9 @@ void game_player_ready(player_id_t player) {
         load_starting_times(&game.players[player]);
     }
 
-    // flush stale tap button press to prevent accidental game start on menu exit
-    button_clear_flags(tap_buttons[player]);
+    // flush stale tap presses from both players to prevent accidental game start
+    button_clear_flags(BUTTON_PLAYER1_TAP);
+    button_clear_flags(BUTTON_PLAYER2_TAP);
 
     invalidate_display_cache(player);
 }
@@ -767,4 +780,8 @@ void game_player_ready(player_id_t player) {
  */
 void game_request_reset(void) {
     transition_to_armed();
+
+    // flush stale tap presses from both players to prevent accidental game start
+    button_clear_flags(BUTTON_PLAYER1_TAP);
+    button_clear_flags(BUTTON_PLAYER2_TAP);
 }
