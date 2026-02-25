@@ -165,6 +165,10 @@ static void transition_to_finished(player_id_t loser) {
     // stop hardware timer
     hardware_stop_clock_timer();
 
+    // flush stale tap presses to prevent immediately dismissing the finished screen
+    button_clear_flags(BUTTON_PLAYER1_TAP);
+    button_clear_flags(BUTTON_PLAYER2_TAP);
+
     // start buzzer beep pattern (only if buzzer is enabled)
     if (game.buzzer_enabled) {
         buzzer_state = BUZZER_BEEP_1;
@@ -301,7 +305,12 @@ static void handle_input_running(void) {
     player_id_t active = game.active_player;
     player_id_t inactive = (active == PLAYER_1) ? PLAYER_2 : PLAYER_1;
 
-    if (button_was_pressed(tap_buttons[active])) {
+    // consume both taps: active player's tap switches turns,
+    // inactive player's tap is discarded to prevent stale presses
+    uint8_t active_tap = button_was_pressed(tap_buttons[active]);
+    button_was_pressed(tap_buttons[inactive]);
+
+    if (active_tap) {
         // apply time control bonus to the player who just moved
         apply_time_control_on_tap(&game.players[active]);
 
