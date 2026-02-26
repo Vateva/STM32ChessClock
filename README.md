@@ -3,6 +3,27 @@ Two-player chess clock built on an STM32F103C8 (Blue Pill) with dual SH1106 OLED
 
 Each player has their own display, rotary encoder, and dedicated buttons. The menu system allows fully independent configuration of starting time, time control mode, and bonus time per player -- making it easy to play odds games (e.g. 10 min vs 5 min, or different time control modes for each player).
 
+## Table of Contents
+- [Hardware Components](#hardware-components)
+- [Assembly](#assembly)
+- [Pinout Configuration](#pinout-configuration)
+- [Key Features](#key-features)
+  - [Game State Machine](#game-state-machine)
+  - [6 Time Control Modes](#6-time-control-modes)
+  - [Independent Player Menus](#independent-player-menus)
+  - [Time Editor](#time-editor)
+  - [Input System](#input-system)
+  - [Buzzer](#buzzer)
+  - [Boot Animation](#boot-animation)
+  - [Display](#display)
+- [Technical Specifications](#technical-specifications)
+  - [Software Architecture](#software-architecture)
+  - [Coordinator Pattern](#coordinator-pattern)
+- [Build Environment](#build-environment)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [License](#license)
+
 ## Hardware Components
 - STM32F103C8 (Blue Pill) running at 8 MHz HSI
 - 2x SH1106 128x64 OLED displays (I2C)
