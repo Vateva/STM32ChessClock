@@ -26,9 +26,9 @@ Each player has their own display, rotary encoder, and dedicated buttons. The me
 
 ## Hardware Components
 - STM32F103C8 (Blue Pill) running at 8 MHz HSI
-- 2x SH1106 128x64 OLED displays (I2C)
-- 2x Rotary encoders with push buttons
-- 6x Tactile buttons (menu, back, tap per player)
+- 2x 1.3" OLED + EC11 rotary encoder modules (SH1106 128x64 I2C display, rotary encoder, and 2 tactile buttons per module)
+- 2x Tactile buttons (tap per player)
+- 1S lithium battery voltage meter module
 - Piezo buzzer (8500 Hz)
   
 ![chessclock components](https://github.com/user-attachments/assets/9850f6b1-77ef-4770-982f-09b8461e3403)
