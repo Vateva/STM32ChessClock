@@ -107,23 +107,28 @@ Buzzer = PA6  // PWM via TIM3
 
 The game operates in 4 phases:
 
-```
-                      ┌──── tap ───┐
-                      │  (switch   │
-                      │   turns)   │
-                      v            │
- ARMED ──────────> RUNNING ───────┘
-   │    first tap   │    │
-   │                │    │ time expires
-   │   menu hold    │    v
-   │     (2s)       │  FINISHED
-   v                v    │
-  MENU            MENU   │ any tap
-   │ (configure)    │    │
-   │          ready │    │
-   └──> ARMED <─────┘    │
-          ^    or reset   │
-          └───────────────┘
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> Armed
+
+    Armed --> ArmedMenu    : hold menu (2s)
+    ArmedMenu --> Armed    : Ready
+
+    Armed --> Running      : tap
+
+    Running --> Running    : active player taps\n(switch turns)
+    Running --> PausedMenu : hold menu (2s)
+    Running --> Finished   : clock hits 0
+
+    PausedMenu --> Paused  : Ready
+    PausedMenu --> Armed   : Reset
+    Paused --> PausedMenu  : hold menu (2s)
+    Paused --> Running     : tap (resume)
+
+    Finished --> Armed     : any tap
+    Finished --> ArmedMenu : hold menu (2s)
 ```
 
 The menu can be entered from both **Armed** and **Running** by holding the menu button for 2 seconds. From Armed, it offers starting time and mode configuration. From Running, the game pauses and the menu additionally offers current time editing and reset.
