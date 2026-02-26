@@ -35,6 +35,9 @@ Each player has their own display, rotary encoder, and dedicated buttons. The me
 
 ## Assembly
 
+### Prototyping
+<!-- TODO: Add breadboard photo -->
+
 ### Solder the components together
 
 ![chesscolockl soldering](https://github.com/user-attachments/assets/2a62bd80-1831-4c23-b995-200da9eb0a03)
